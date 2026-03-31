@@ -23,6 +23,15 @@ pub enum WebhookAction {
 pub struct WebhookRegisterArgs {
     /// Webhook URL
     pub url: String,
+    /// Events to subscribe to (comma-separated, e.g., "tab.charged,tab.closed")
+    #[arg(
+        long,
+        default_value = "tab.opened,tab.charged,tab.closed,tab.topped_up,payment.completed"
+    )]
+    pub events: String,
+    /// Webhook secret for HMAC verification
+    #[arg(long, default_value = "whsec_default")]
+    pub secret: String,
 }
 
 #[derive(Args)]
@@ -36,7 +45,12 @@ pub async fn run(args: WebhookArgs, mut ctx: super::Context) -> Result<()> {
 
     match args.action {
         WebhookAction::Register(a) => {
-            let body = serde_json::json!({ "url": a.url });
+            let events: Vec<&str> = a.events.split(',').map(|s| s.trim()).collect();
+            let body = serde_json::json!({
+                "url": a.url,
+                "events": events,
+                "secret": a.secret,
+            });
             let resp = ctx.post("/webhooks", &body).await?;
             if ctx.json {
                 error::print_json(&resp);

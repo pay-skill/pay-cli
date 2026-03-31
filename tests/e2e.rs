@@ -44,7 +44,10 @@ fn testnet_url() -> String {
 
 /// Provider address for test payments.
 fn provider_addr() -> String {
-    env::var("PAYSKILL_TESTNET_PROVIDER").unwrap_or_else(|_| format!("0x{}", "b2".repeat(20)))
+    env::var("PAYSKILL_TESTNET_PROVIDER")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| format!("0x{}", "b2".repeat(20)))
 }
 
 /// Build a `pay` command pre-configured for testnet (requires PAYSKILL_TESTNET_KEY).
@@ -285,7 +288,11 @@ fn webhook_crud() {
         .args(["--json", "webhook", "register", &hook_url])
         .output()
         .expect("failed to run webhook register");
-    assert!(reg_output.status.success(), "webhook register failed");
+    assert!(
+        reg_output.status.success(),
+        "webhook register failed: {}",
+        String::from_utf8_lossy(&reg_output.stderr)
+    );
     let reg_json: serde_json::Value =
         serde_json::from_slice(&reg_output.stdout).expect("invalid JSON from webhook register");
     let wh_id = reg_json["id"]
@@ -309,31 +316,6 @@ fn webhook_crud() {
     pay().args(["webhook", "delete", wh_id]).assert().success();
 }
 
-// ── Fund / Withdraw Links ───────────────────────────────────────────
-
-#[test]
-#[ignore = "requires PAYSKILL_TESTNET_KEY"]
-fn fund_link() {
-    if !has_testnet_key() {
-        return;
-    }
-    pay()
-        .args(["--json", "fund"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("url"));
-}
-
-#[test]
-#[ignore = "requires PAYSKILL_TESTNET_KEY"]
-fn withdraw_link() {
-    if !has_testnet_key() {
-        return;
-    }
-    let addr = format!("0x{}", "a1".repeat(20));
-    pay()
-        .args(["--json", "withdraw", &addr, "5.00"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("url"));
-}
+// Note: fund_link and withdraw_link tests removed — server doesn't
+// have /fund-link or /withdraw-link endpoints yet. These are dashboard
+// functions, not API endpoints.

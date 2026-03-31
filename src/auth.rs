@@ -86,8 +86,8 @@ fn compute_eip712_hash(
     let name_hash = keccak256(b"pay");
     let version_hash = keccak256(b"0.1");
 
-    let contract_bytes = parse_address(verifying_contract)
-        .context("invalid router address for EIP-712 domain")?;
+    let contract_bytes =
+        parse_address(verifying_contract).context("invalid router address for EIP-712 domain")?;
 
     // Domain separator
     let mut domain_enc = [0u8; 160];
@@ -100,8 +100,8 @@ fn compute_eip712_hash(
 
     // Parse nonce
     let nonce_clean = nonce_hex.strip_prefix("0x").unwrap_or(nonce_hex);
-    let nonce_bytes = hex::decode(nonce_clean)
-        .map_err(|e| anyhow::anyhow!("invalid nonce hex: {e}"))?;
+    let nonce_bytes =
+        hex::decode(nonce_clean).map_err(|e| anyhow::anyhow!("invalid nonce hex: {e}"))?;
     let mut nonce32 = [0u8; 32];
     let len = nonce_bytes.len().min(32);
     nonce32[..len].copy_from_slice(&nonce_bytes[..len]);
@@ -135,10 +135,12 @@ fn keccak256(data: &[u8]) -> [u8; 32] {
 
 fn parse_address(addr: &str) -> Result<[u8; 20]> {
     let clean = addr.strip_prefix("0x").unwrap_or(addr);
-    let bytes = hex::decode(clean)
-        .map_err(|e| anyhow::anyhow!("invalid address hex: {e}"))?;
+    let bytes = hex::decode(clean).map_err(|e| anyhow::anyhow!("invalid address hex: {e}"))?;
     if bytes.len() != 20 {
-        return Err(anyhow::anyhow!("address must be 20 bytes, got {}", bytes.len()));
+        return Err(anyhow::anyhow!(
+            "address must be 20 bytes, got {}",
+            bytes.len()
+        ));
     }
     let mut out = [0u8; 20];
     out.copy_from_slice(&bytes);
@@ -163,7 +165,8 @@ mod tests {
     #[test]
     fn build_and_verify_auth_headers() {
         let key = SigningKey::from_slice(&hex::decode(ANVIL_PK).unwrap()).unwrap();
-        let headers = build_auth_headers(&key, "POST", "/api/v1/direct", 8453, TEST_CONTRACT).unwrap();
+        let headers =
+            build_auth_headers(&key, "POST", "/api/v1/direct", 8453, TEST_CONTRACT).unwrap();
 
         assert_eq!(headers.len(), 4);
 

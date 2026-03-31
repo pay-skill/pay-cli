@@ -55,7 +55,9 @@ impl Context {
         let chain_id = self.config.chain_id();
         let router = self.config.router_address();
         if router.is_empty() {
-            bail!("router_address not set in config. Set ROUTER_ADDRESS or update ~/.pay/config.toml");
+            bail!(
+                "router_address not set in config. Set ROUTER_ADDRESS or update ~/.pay/config.toml"
+            );
         }
         auth::build_auth_headers(key, method, path, chain_id, router)
     }

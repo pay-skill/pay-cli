@@ -26,8 +26,7 @@ pub async fn run(_args: InitArgs, _ctx: super::Context) -> Result<()> {
     if password.is_empty() {
         // Generate a random password and tell the user to save it
         let mut pw_bytes = [0u8; 32];
-        getrandom::fill(&mut pw_bytes)
-            .map_err(|e| anyhow::anyhow!("rng failed: {e}"))?;
+        getrandom::fill(&mut pw_bytes).map_err(|e| anyhow::anyhow!("rng failed: {e}"))?;
         let generated_pw = hex::encode(pw_bytes);
 
         keystore::store_key(&key, &generated_pw)?;

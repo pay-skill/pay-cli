@@ -75,8 +75,7 @@ pub fn load_key(password: &str) -> Result<SigningKey> {
     let encrypted: EncryptedKey =
         serde_json::from_str(&json).context("failed to parse key file")?;
 
-    let nonce_bytes =
-        hex::decode(&encrypted.nonce).context("invalid nonce in key file")?;
+    let nonce_bytes = hex::decode(&encrypted.nonce).context("invalid nonce in key file")?;
     let ciphertext =
         hex::decode(&encrypted.ciphertext).context("invalid ciphertext in key file")?;
 
@@ -130,8 +129,7 @@ fn key_path() -> PathBuf {
 fn derive_cipher(password: &str) -> Result<Aes256Gcm> {
     use sha3::{Digest, Sha3_256};
     let key = Sha3_256::digest(password.as_bytes());
-    Ok(Aes256Gcm::new_from_slice(&key)
-        .map_err(|e| anyhow::anyhow!("cipher init failed: {e}"))?)
+    Ok(Aes256Gcm::new_from_slice(&key).map_err(|e| anyhow::anyhow!("cipher init failed: {e}"))?)
 }
 
 #[cfg(test)]
@@ -184,10 +182,7 @@ mod tests {
             .unwrap();
 
         let recovered = SigningKey::from_slice(&plaintext).unwrap();
-        assert_eq!(
-            derive_address(&key),
-            derive_address(&recovered)
-        );
+        assert_eq!(derive_address(&key), derive_address(&recovered));
 
         let _ = fs::remove_dir_all(&dir);
     }

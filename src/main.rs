@@ -1,9 +1,11 @@
 mod auth;
 mod commands;
 mod config;
+mod eip3009;
 #[allow(dead_code)]
 mod error;
 mod keystore;
+mod permit;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};

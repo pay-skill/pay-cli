@@ -4,6 +4,7 @@ mod config;
 #[allow(dead_code)]
 mod error;
 mod keystore;
+mod permit;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};

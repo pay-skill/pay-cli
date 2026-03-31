@@ -184,7 +184,7 @@ fn mint_testnet_usdc() {
 // ── Direct Payment ──────────────────────────────────────────────────
 
 #[test]
-#[ignore = "requires permit signing (not yet implemented)"]
+#[ignore = "requires PAYSKILL_TESTNET_KEY"]
 fn direct_payment_succeeds() {
     if !has_testnet_key() {
         return;
@@ -206,7 +206,7 @@ fn direct_payment_succeeds() {
 // ── Tab Lifecycle ───────────────────────────────────────────────────
 
 #[test]
-#[ignore = "requires permit signing (not yet implemented)"]
+#[ignore = "requires PAYSKILL_TESTNET_KEY"]
 fn tab_lifecycle() {
     if !has_testnet_key() {
         return;

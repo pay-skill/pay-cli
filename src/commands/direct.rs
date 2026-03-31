@@ -22,10 +22,29 @@ pub async fn run(args: DirectArgs, mut ctx: super::Context) -> Result<()> {
         anyhow::bail!("Minimum direct payment is $1.00");
     }
 
+    // Fetch contract addresses to determine the spender (PayDirect contract)
+    let contracts = crate::permit::get_contracts(&mut ctx).await?;
+    if contracts.direct.is_empty() {
+        anyhow::bail!("PayDirect contract address not available from server");
+    }
+
+    // Sign EIP-2612 permit for USDC approval
+    let permit = crate::permit::prepare_and_sign(&mut ctx, amount, &contracts.direct).await?;
+
+    let memo_hex = args
+        .memo
+        .as_deref()
+        .unwrap_or("")
+        .as_bytes()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect::<String>();
+
     let body = serde_json::json!({
         "to": args.to,
         "amount": amount,
-        "memo": args.memo.unwrap_or_default(),
+        "memo": memo_hex,
+        "permit": permit.to_json(),
     });
 
     let resp = ctx.post("/direct", &body).await?;

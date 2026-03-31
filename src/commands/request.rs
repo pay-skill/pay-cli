@@ -41,6 +41,9 @@ pub async fn run(args: RequestArgs, mut ctx: super::Context) -> Result<()> {
         ));
     }
 
+    // Fetch contract addresses for permit signing
+    let contracts = crate::permit::get_contracts(&mut ctx).await?;
+
     // Pay via the appropriate settlement mode
     if settlement == "tab" {
         let charge_body = serde_json::json!({ "amount": amount });
@@ -58,11 +61,18 @@ pub async fn run(args: RequestArgs, mut ctx: super::Context) -> Result<()> {
         let tab_id = if let Some(t) = tab {
             t["id"].as_str().unwrap_or("").to_string()
         } else {
+            // Auto-open a tab: 10x the per-call price, min $5
             let tab_amount = std::cmp::max(amount * 10, 5_000_000);
+
+            // Sign EIP-2612 permit for tab opening
+            let permit =
+                crate::permit::prepare_and_sign(&mut ctx, tab_amount, &contracts.tab).await?;
+
             let open_body = serde_json::json!({
                 "provider": to,
                 "amount": tab_amount,
                 "max_charge_per_call": amount,
+                "permit": permit.to_json(),
             });
             let open_resp = ctx.post("/tabs", &open_body).await?;
             open_resp["tab_id"].as_str().unwrap_or("").to_string()
@@ -71,9 +81,15 @@ pub async fn run(args: RequestArgs, mut ctx: super::Context) -> Result<()> {
         ctx.post(&format!("/tabs/{tab_id}/charge"), &charge_body)
             .await?;
     } else {
+        // Direct settlement — sign EIP-2612 permit
+        let permit =
+            crate::permit::prepare_and_sign(&mut ctx, amount, &contracts.direct).await?;
+
         let pay_body = serde_json::json!({
             "to": to,
             "amount": amount,
+            "memo": "",
+            "permit": permit.to_json(),
         });
         ctx.post("/direct", &pay_body).await?;
     }

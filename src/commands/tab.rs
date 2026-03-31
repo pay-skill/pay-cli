@@ -76,10 +76,20 @@ async fn run_open(args: TabOpenArgs, ctx: &mut super::Context) -> Result<()> {
     }
     let max_charge = super::parse_amount(&args.max_charge)?;
 
+    // Fetch contract addresses to determine the spender (PayTab contract)
+    let contracts = crate::permit::get_contracts(ctx).await?;
+    if contracts.tab.is_empty() {
+        anyhow::bail!("PayTab contract address not available from server");
+    }
+
+    // Sign EIP-2612 permit for USDC approval
+    let permit = crate::permit::prepare_and_sign(ctx, amount, &contracts.tab).await?;
+
     let body = serde_json::json!({
         "provider": args.provider,
         "amount": amount,
         "max_charge_per_call": max_charge,
+        "permit": permit.to_json(),
     });
     let resp = ctx.post("/tabs", &body).await?;
 
@@ -145,7 +155,20 @@ async fn run_charge(args: TabChargeArgs, ctx: &mut super::Context) -> Result<()>
 
 async fn run_topup(args: TabTopupArgs, ctx: &mut super::Context) -> Result<()> {
     let amount = super::parse_amount(&args.amount)?;
-    let body = serde_json::json!({ "amount": amount });
+
+    // Fetch contract addresses to determine the spender (PayTab contract)
+    let contracts = crate::permit::get_contracts(ctx).await?;
+    if contracts.tab.is_empty() {
+        anyhow::bail!("PayTab contract address not available from server");
+    }
+
+    // Sign EIP-2612 permit for USDC approval
+    let permit = crate::permit::prepare_and_sign(ctx, amount, &contracts.tab).await?;
+
+    let body = serde_json::json!({
+        "amount": amount,
+        "permit": permit.to_json(),
+    });
     let resp = ctx
         .post(&format!("/tabs/{}/topup", args.tab_id), &body)
         .await?;

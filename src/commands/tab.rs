@@ -60,11 +60,11 @@ pub async fn run(args: TabArgs, mut ctx: super::Context) -> Result<()> {
     super::require_init()?;
 
     match args.action {
-        TabAction::Open(a) => run_open(a, &ctx).await,
-        TabAction::Close(a) => run_close(a, &ctx).await,
-        TabAction::Charge(a) => run_charge(a, &ctx).await,
-        TabAction::Topup(a) => run_topup(a, &ctx).await,
-        TabAction::List => run_list(&ctx).await,
+        TabAction::Open(a) => run_open(a, &mut ctx).await,
+        TabAction::Close(a) => run_close(a, &mut ctx).await,
+        TabAction::Charge(a) => run_charge(a, &mut ctx).await,
+        TabAction::Topup(a) => run_topup(a, &mut ctx).await,
+        TabAction::List => run_list(&mut ctx).await,
     }
 }
 

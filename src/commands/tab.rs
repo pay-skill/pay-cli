@@ -56,19 +56,19 @@ pub struct TabTopupArgs {
     pub amount: String,
 }
 
-pub async fn run(args: TabArgs, ctx: super::Context) -> Result<()> {
+pub async fn run(args: TabArgs, mut ctx: super::Context) -> Result<()> {
     super::require_init()?;
 
     match args.action {
-        TabAction::Open(a) => run_open(a, &ctx).await,
-        TabAction::Close(a) => run_close(a, &ctx).await,
-        TabAction::Charge(a) => run_charge(a, &ctx).await,
-        TabAction::Topup(a) => run_topup(a, &ctx).await,
-        TabAction::List => run_list(&ctx).await,
+        TabAction::Open(a) => run_open(a, &mut ctx).await,
+        TabAction::Close(a) => run_close(a, &mut ctx).await,
+        TabAction::Charge(a) => run_charge(a, &mut ctx).await,
+        TabAction::Topup(a) => run_topup(a, &mut ctx).await,
+        TabAction::List => run_list(&mut ctx).await,
     }
 }
 
-async fn run_open(args: TabOpenArgs, ctx: &super::Context) -> Result<()> {
+async fn run_open(args: TabOpenArgs, ctx: &mut super::Context) -> Result<()> {
     super::validate_address(&args.provider)?;
     let amount = super::parse_amount(&args.amount)?;
     if amount < 5_000_000 {
@@ -97,7 +97,7 @@ async fn run_open(args: TabOpenArgs, ctx: &super::Context) -> Result<()> {
     Ok(())
 }
 
-async fn run_close(args: TabCloseArgs, ctx: &super::Context) -> Result<()> {
+async fn run_close(args: TabCloseArgs, ctx: &mut super::Context) -> Result<()> {
     let resp = ctx
         .post(
             &format!("/tabs/{}/close", args.tab_id),
@@ -120,7 +120,7 @@ async fn run_close(args: TabCloseArgs, ctx: &super::Context) -> Result<()> {
     Ok(())
 }
 
-async fn run_charge(args: TabChargeArgs, ctx: &super::Context) -> Result<()> {
+async fn run_charge(args: TabChargeArgs, ctx: &mut super::Context) -> Result<()> {
     let amount = super::parse_amount(&args.amount)?;
     let body = serde_json::json!({ "amount": amount });
     let resp = ctx
@@ -143,7 +143,7 @@ async fn run_charge(args: TabChargeArgs, ctx: &super::Context) -> Result<()> {
     Ok(())
 }
 
-async fn run_topup(args: TabTopupArgs, ctx: &super::Context) -> Result<()> {
+async fn run_topup(args: TabTopupArgs, ctx: &mut super::Context) -> Result<()> {
     let amount = super::parse_amount(&args.amount)?;
     let body = serde_json::json!({ "amount": amount });
     let resp = ctx
@@ -164,7 +164,7 @@ async fn run_topup(args: TabTopupArgs, ctx: &super::Context) -> Result<()> {
     Ok(())
 }
 
-async fn run_list(ctx: &super::Context) -> Result<()> {
+async fn run_list(ctx: &mut super::Context) -> Result<()> {
     let resp = ctx.get("/tabs").await?;
 
     if ctx.json {

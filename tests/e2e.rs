@@ -214,9 +214,7 @@ fn tab_lifecycle() {
     );
     let open_json: serde_json::Value =
         serde_json::from_slice(&open_output.stdout).expect("invalid JSON from tab open");
-    let tab_id = open_json["tab_id"]
-        .as_str()
-        .expect("no tab_id in response");
+    let tab_id = open_json["tab_id"].as_str().expect("no tab_id in response");
     assert!(!tab_id.is_empty());
 
     // 2. List tabs — new tab should appear
@@ -247,9 +245,7 @@ fn tab_lifecycle() {
         .args(["--json", "tab", "close", tab_id])
         .assert()
         .success()
-        .stdout(
-            predicate::str::contains("total_charged").or(predicate::str::contains("closed")),
-        );
+        .stdout(predicate::str::contains("total_charged").or(predicate::str::contains("closed")));
 }
 
 // ── Webhooks ────────────────────────────────────────────────────────

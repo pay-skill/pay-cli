@@ -145,7 +145,10 @@ async fn main() -> Result<()> {
             let amount = commands::parse_amount(&args.amount)?;
             let wallet = ctx.address()?;
             let resp = ctx
-                .post("/mint", &serde_json::json!({ "wallet": wallet, "amount": amount }))
+                .post(
+                    "/mint",
+                    &serde_json::json!({ "wallet": wallet, "amount": amount }),
+                )
                 .await?;
             if ctx.json {
                 error::print_json(&resp);

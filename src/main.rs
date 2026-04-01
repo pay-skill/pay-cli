@@ -128,7 +128,7 @@ async fn main() -> Result<()> {
         Commands::Withdraw(args) => {
             commands::require_init()?;
             commands::validate_address(&args.to)?;
-            let amount = commands::parse_amount(&args.amount)?;
+            let _amount = commands::parse_amount(&args.amount)?;
             let resp = ctx.post("/links/withdraw", &serde_json::json!({})).await?;
             let url = resp["url"].as_str().unwrap_or("");
             if ctx.json {

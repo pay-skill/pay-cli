@@ -158,7 +158,7 @@ async fn main() -> Result<()> {
                 let tx = resp["tx_hash"].as_str().unwrap_or("unknown");
                 error::success(&format!(
                     "Minted {} testnet USDC\n  Tx: {tx}",
-                    commands::format_amount(amount)
+                    commands::format_amount(micro)
                 ));
             }
             Ok(())

@@ -17,7 +17,7 @@ static LOCAL_INIT: Once = Once::new();
 
 // Testnet contract addresses (Base Sepolia).
 const TESTNET_CHAIN_ID: &str = "84532";
-const TESTNET_ROUTER: &str = "0x3A6d9C4d5f0ef2E2f282A6BB0BDf6d4707ea3B95";
+const TESTNET_ROUTER: &str = "0xE0Aa45e6937F3b9Fc0BEe457361885Cb9bfC067F";
 
 /// Ensure `pay init` has been run (idempotent, runs once per test suite).
 /// Only call from tests that have PAYSKILL_TESTNET_KEY set.
@@ -40,7 +40,7 @@ fn has_testnet_key() -> bool {
 /// Testnet API URL (falls back to testnet default).
 fn testnet_url() -> String {
     env::var("PAYSKILL_API_URL")
-        .unwrap_or_else(|_| "http://204.168.133.111:3001/api/v1".to_string())
+        .unwrap_or_else(|_| "https://testnet.pay-skill.com/api/v1".to_string())
 }
 
 /// Provider address for test payments.

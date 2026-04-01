@@ -32,6 +32,7 @@ fn ensure_init() {
 }
 
 /// Return true if testnet env vars are set.
+#[allow(dead_code)]
 fn has_testnet_key() -> bool {
     env::var("PAYSKILL_TESTNET_KEY").is_ok()
 }
@@ -95,9 +96,6 @@ fn pay_local() -> Command {
 #[test]
 #[ignore = "requires PAYSKILL_TESTNET_KEY"]
 fn init_creates_config() {
-    if !has_testnet_key() {
-        return;
-    }
     ensure_init();
 }
 
@@ -137,9 +135,6 @@ fn tab_open_rejects_below_minimum() {
 #[test]
 #[ignore = "requires PAYSKILL_TESTNET_KEY"]
 fn unsigned_request_rejected() {
-    if !has_testnet_key() {
-        return;
-    }
     // Send a request WITHOUT a valid signer — should fail.
     let mut cmd = Command::cargo_bin("pay").expect("binary not found");
     cmd.arg("--api-url").arg(testnet_url());
@@ -156,9 +151,6 @@ fn unsigned_request_rejected() {
 #[test]
 #[ignore = "requires PAYSKILL_TESTNET_KEY"]
 fn status_returns_balance() {
-    if !has_testnet_key() {
-        return;
-    }
     pay()
         .args(["--json", "status"])
         .assert()
@@ -171,9 +163,6 @@ fn status_returns_balance() {
 #[test]
 #[ignore = "requires PAYSKILL_TESTNET_KEY"]
 fn mint_testnet_usdc() {
-    if !has_testnet_key() {
-        return;
-    }
     pay()
         .args(["--json", "mint", "100.00"])
         .assert()
@@ -186,9 +175,6 @@ fn mint_testnet_usdc() {
 #[test]
 #[ignore = "requires PAYSKILL_TESTNET_KEY"]
 fn direct_payment_succeeds() {
-    if !has_testnet_key() {
-        return;
-    }
     pay()
         .args([
             "--json",
@@ -208,10 +194,6 @@ fn direct_payment_succeeds() {
 #[test]
 #[ignore = "requires PAYSKILL_TESTNET_KEY"]
 fn tab_lifecycle() {
-    if !has_testnet_key() {
-        return;
-    }
-
     // 1. Open tab
     let open_output = pay()
         .args([
@@ -258,6 +240,13 @@ fn tab_lifecycle() {
         String::from_utf8_lossy(&topup_output.stderr)
     );
 
+    // TODO: Add a charge step here (open -> list -> topup -> charge -> close).
+    // Charging requires the provider's private key (PAYSKILL_TESTNET_PROVIDER_KEY),
+    // which is a separate wallet from the agent's PAYSKILL_TESTNET_KEY. The test
+    // infrastructure currently only provisions a single keypair. To test charge,
+    // add a second env var for the provider key and build a pay_provider() helper
+    // that constructs a Command authenticated as the provider.
+
     // 4. Close tab
     pay()
         .args(["--json", "tab", "close", tab_id])
@@ -271,10 +260,6 @@ fn tab_lifecycle() {
 #[test]
 #[ignore = "requires PAYSKILL_TESTNET_KEY"]
 fn webhook_crud() {
-    if !has_testnet_key() {
-        return;
-    }
-
     let hook_url = format!(
         "https://example.com/hook/e2e-{}",
         std::time::SystemTime::now()
@@ -321,9 +306,6 @@ fn webhook_crud() {
 #[test]
 #[ignore = "requires PAYSKILL_TESTNET_KEY"]
 fn sign_subprocess_produces_valid_signature() {
-    if !has_testnet_key() {
-        return;
-    }
     // 32-byte test hash (hex-encoded, no 0x prefix)
     let test_hash = "de".repeat(32);
 
@@ -359,44 +341,42 @@ fn sign_subprocess_produces_valid_signature() {
 #[test]
 #[ignore = "requires PAYSKILL_TESTNET_KEY"]
 fn fund_returns_link() {
-    if !has_testnet_key() {
-        return;
-    }
     let output = pay()
         .args(["--json", "fund"])
         .output()
         .expect("failed to run pay fund");
 
-    // Fund might succeed with a URL or fail if endpoint not configured
-    // Either way it shouldn't crash
-    if output.status.success() {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        assert!(
-            stdout.contains("url") || stdout.contains("http"),
-            "fund should return a URL or url field"
-        );
-    }
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        output.status.success(),
+        "fund command should succeed: {stderr}"
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("url") || stdout.contains("http"),
+        "fund should return a URL or url field"
+    );
 }
 
 #[test]
 #[ignore = "requires PAYSKILL_TESTNET_KEY"]
 fn withdraw_returns_link() {
-    if !has_testnet_key() {
-        return;
-    }
     let addr = provider_addr();
     let output = pay()
         .args(["--json", "withdraw", &addr, "1.00"])
         .output()
         .expect("failed to run pay withdraw");
 
-    if output.status.success() {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        assert!(
-            stdout.contains("url") || stdout.contains("http"),
-            "withdraw should return a URL or url field"
-        );
-    }
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        output.status.success(),
+        "withdraw command should succeed: {stderr}"
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("url") || stdout.contains("http"),
+        "withdraw should return a URL or url field"
+    );
 }
 
 // ── x402 Request ──────────────────────────────────────────────────
@@ -404,10 +384,6 @@ fn withdraw_returns_link() {
 #[test]
 #[ignore = "requires PAYSKILL_TESTNET_KEY"]
 fn x402_request_handles_402_and_pays() {
-    if !has_testnet_key() {
-        return;
-    }
-
     // Start a mini HTTP server returning 402 on first request,
     // then 200 when X-Payment-Tx header is present.
     let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind failed");
@@ -464,10 +440,10 @@ fn x402_request_handles_402_and_pays() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
 
-    // Success: either got 200 with content, or at least made the payment
+    // Must succeed AND show evidence of payment
     assert!(
-        output.status.success() || stdout.contains("paid") || stdout.contains("tx_hash"),
-        "x402 request should succeed or show payment. stdout={stdout}, stderr={stderr}"
+        output.status.success() && (stdout.contains("paid") || stdout.contains("tx_hash")),
+        "x402 request should succeed with payment evidence. stdout={stdout}, stderr={stderr}"
     );
 }
 
@@ -476,9 +452,6 @@ fn x402_request_handles_402_and_pays() {
 #[test]
 #[ignore = "requires PAYSKILL_TESTNET_KEY"]
 fn address_returns_valid_format() {
-    if !has_testnet_key() {
-        return;
-    }
     let output = pay()
         .args(["address"])
         .output()

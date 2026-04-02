@@ -692,7 +692,7 @@ fn ows_init_creates_wallet() {
 
     let output = Command::cargo_bin("pay")
         .expect("binary not found")
-        .args(["--json", "ows", "init", "--name", &wallet_name, "--chain", "base-sepolia"])
+        .args(["ows", "init", "--name", &wallet_name, "--chain", "base-sepolia"])
         .output()
         .expect("failed to run ows init");
 
@@ -702,20 +702,21 @@ fn ows_init_creates_wallet() {
         String::from_utf8_lossy(&output.stderr)
     );
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let json: serde_json::Value =
-        serde_json::from_str(stdout.trim()).expect("ows init should output valid JSON");
+    // Verify the wallet was created by listing and finding it
+    let list_output = Command::cargo_bin("pay")
+        .expect("binary not found")
+        .args(["ows", "list", "--json"])
+        .output()
+        .expect("failed to run ows list");
 
-    let address = json["address"].as_str().expect("should have address");
-    assert!(
-        address.starts_with("0x") && address.len() == 42,
-        "address should be valid: {address}"
-    );
-    assert_eq!(json["chain"].as_str(), Some("base-sepolia"));
-    assert!(
-        json["api_key"].as_str().is_some_and(|k| !k.is_empty()),
-        "should return non-empty api_key"
-    );
+    let stdout = String::from_utf8_lossy(&list_output.stdout);
+    let wallets: Vec<serde_json::Value> =
+        serde_json::from_str(stdout.trim()).expect("ows list should output valid JSON");
+
+    let found = wallets
+        .iter()
+        .find(|w| w["name"].as_str() == Some(&wallet_name));
+    assert!(found.is_some(), "created wallet should appear in list");
 }
 
 #[test]

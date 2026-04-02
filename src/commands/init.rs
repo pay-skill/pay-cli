@@ -6,6 +6,12 @@ use crate::config::Config;
 use crate::error;
 use crate::keystore;
 
+/// Initialize a Pay agent wallet (default signer).
+///
+/// Generates a secp256k1 keypair and stores it encrypted with AES-256-GCM.
+/// This is Pay's own signer — priority #1. For other signer modes, see:
+///   pay ows init   — Open Wallet Standard
+///   pay key init   — plain private key
 #[derive(Args)]
 pub struct InitArgs;
 
@@ -17,14 +23,11 @@ pub async fn run(_args: InitArgs, _ctx: super::Context) -> Result<()> {
         return Ok(());
     }
 
-    // Generate a new keypair
     let key = keystore::generate_key()?;
     let addr = auth::derive_address(&key);
 
-    // Determine password for encryption
     let password = std::env::var("PAYSKILL_SIGNER_KEY").unwrap_or_default();
     if password.is_empty() {
-        // Generate a random password and tell the user to save it
         let mut pw_bytes = [0u8; 32];
         getrandom::fill(&mut pw_bytes).map_err(|e| anyhow::anyhow!("rng failed: {e}"))?;
         let generated_pw = hex::encode(pw_bytes);

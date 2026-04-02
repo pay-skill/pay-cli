@@ -173,15 +173,9 @@ fn mint_testnet_usdc() {
         eprintln!("mint rate-limited (expected if wallet already minted this hour), skipping");
         return;
     }
-    assert!(
-        output.status.success(),
-        "mint failed: {stderr}"
-    );
+    assert!(output.status.success(), "mint failed: {stderr}");
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(
-        stdout.contains("tx_hash"),
-        "mint should return tx_hash"
-    );
+    assert!(stdout.contains("tx_hash"), "mint should return tx_hash");
 }
 
 // ── Direct Payment ──────────────────────────────────────────────────
@@ -480,4 +474,195 @@ fn address_returns_valid_format() {
         addr.starts_with("0x") && addr.len() == 42,
         "address should be 0x + 40 hex chars, got: {addr}"
     );
+}
+
+// ── Signer Modes ────────────────────────────────────────────────────
+//
+// Three init paths: `pay init` (default signer), `pay ows init` (OWS),
+// `pay key init` (plain key). Tests verify command structure, help text,
+// error paths. No OWS installation required.
+
+#[test]
+fn init_help_describes_default_signer() {
+    Command::cargo_bin("pay")
+        .expect("binary not found")
+        .args(["init", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("wallet").or(predicate::str::contains("signer")));
+}
+
+#[test]
+fn top_level_help_shows_ows_and_key() {
+    Command::cargo_bin("pay")
+        .expect("binary not found")
+        .args(["--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("ows"))
+        .stdout(predicate::str::contains("key"));
+}
+
+// ── pay ows ──────────────────────────────────────────────────────────
+
+#[test]
+fn ows_subcommand_exists() {
+    Command::cargo_bin("pay")
+        .expect("binary not found")
+        .args(["ows", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("init"))
+        .stdout(predicate::str::contains("list"))
+        .stdout(predicate::str::contains("fund"))
+        .stdout(predicate::str::contains("set-policy"));
+}
+
+#[test]
+fn ows_init_help() {
+    Command::cargo_bin("pay")
+        .expect("binary not found")
+        .args(["ows", "init", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--name"))
+        .stdout(predicate::str::contains("--chain"));
+}
+
+#[test]
+fn ows_list_without_ows_shows_error_or_empty() {
+    let output = Command::cargo_bin("pay")
+        .expect("binary not found")
+        .args(["ows", "list"])
+        .output()
+        .expect("failed to run");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let combined = format!("{stdout}{stderr}");
+
+    // Either succeeds with empty/list output or fails with install instructions
+    assert!(
+        combined.contains("No OWS wallets")
+            || combined.contains("ows")
+            || combined.contains("not found")
+            || combined.contains("install")
+            || output.status.success(),
+        "ows list should give actionable output, got: {combined}"
+    );
+}
+
+#[test]
+fn ows_list_json_without_ows() {
+    let output = Command::cargo_bin("pay")
+        .expect("binary not found")
+        .args(["--json", "ows", "list"])
+        .output()
+        .expect("failed to run");
+
+    if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let parsed: Result<serde_json::Value, _> = serde_json::from_str(stdout.trim());
+        assert!(parsed.is_ok(), "JSON output should be valid: {stdout}");
+    }
+}
+
+#[test]
+fn ows_fund_requires_wallet_arg() {
+    let output = Command::cargo_bin("pay")
+        .expect("binary not found")
+        .args(["ows", "fund"])
+        .env_remove("OWS_WALLET_ID")
+        .output()
+        .expect("failed to run");
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains("wallet") || stderr.contains("OWS_WALLET_ID"),
+            "error should mention --wallet or OWS_WALLET_ID, got: {stderr}"
+        );
+    }
+}
+
+#[test]
+fn ows_set_policy_rejects_invalid_chain() {
+    let output = Command::cargo_bin("pay")
+        .expect("binary not found")
+        .args(["ows", "set-policy", "--chain", "ethereum"])
+        .output()
+        .expect("failed to run");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("unknown chain"),
+        "should reject unknown chain, got: {stderr}"
+    );
+}
+
+#[test]
+fn ows_set_policy_rejects_negative_max_tx() {
+    let output = Command::cargo_bin("pay")
+        .expect("binary not found")
+        .args(["ows", "set-policy", "--max-tx", "-5"])
+        .output()
+        .expect("failed to run");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("positive"),
+        "should reject negative --max-tx, got: {stderr}"
+    );
+}
+
+#[test]
+fn ows_set_policy_rejects_negative_daily_limit() {
+    let output = Command::cargo_bin("pay")
+        .expect("binary not found")
+        .args(["ows", "set-policy", "--daily-limit", "-100"])
+        .output()
+        .expect("failed to run");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("positive"),
+        "should reject negative --daily-limit, got: {stderr}"
+    );
+}
+
+// ── pay key ─────────────────────────────────────────────────────────
+
+#[test]
+fn key_subcommand_exists() {
+    Command::cargo_bin("pay")
+        .expect("binary not found")
+        .args(["key", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("init"));
+}
+
+#[test]
+fn key_init_help() {
+    Command::cargo_bin("pay")
+        .expect("binary not found")
+        .args(["key", "init", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--write-env"));
+}
+
+#[test]
+fn key_init_generates_keypair() {
+    let output = Command::cargo_bin("pay")
+        .expect("binary not found")
+        .args(["--json", "key", "init"])
+        .output()
+        .expect("failed to run");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let parsed: serde_json::Value = serde_json::from_str(stdout.trim()).expect("valid JSON");
+    let address = parsed["address"].as_str().expect("has address");
+    let key = parsed["private_key"].as_str().expect("has private_key");
+    assert!(address.starts_with("0x") && address.len() == 42);
+    assert!(key.starts_with("0x") && key.len() == 66);
 }

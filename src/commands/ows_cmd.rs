@@ -1,3 +1,8 @@
+//! `pay ows` subcommand — Open Wallet Standard integration.
+//!
+//! All interaction goes through the `ows` CLI binary (subprocess).
+//! If OWS isn't installed, commands fail loud with install instructions.
+
 use anyhow::Result;
 use clap::Subcommand;
 
@@ -6,19 +11,30 @@ use crate::error;
 use crate::ows;
 
 #[derive(Subcommand)]
-pub enum WalletAction {
+pub enum OwsAction {
+    /// Create an OWS wallet with chain-lock policy and API key
+    Init(OwsInitArgs),
     /// List all OWS wallets
     List,
-    /// Generate a fund link for a wallet
-    Fund(WalletFundArgs),
-    /// Set spending policy on a wallet
+    /// Generate a fund link for an OWS wallet
+    Fund(OwsFundArgs),
+    /// Set spending policy on an OWS wallet
     SetPolicy(SetPolicyArgs),
-    /// Update wallet display settings
-    Settings(WalletSettingsArgs),
 }
 
 #[derive(clap::Args)]
-pub struct WalletFundArgs {
+pub struct OwsInitArgs {
+    /// Wallet name (default: pay-{hostname})
+    #[arg(long)]
+    pub name: Option<String>,
+
+    /// Chain: "base" (mainnet) or "base-sepolia" (testnet)
+    #[arg(long)]
+    pub chain: Option<String>,
+}
+
+#[derive(clap::Args)]
+pub struct OwsFundArgs {
     /// Wallet name or ID (default: detect from OWS_WALLET_ID env)
     #[arg(long)]
     pub wallet: Option<String>,
@@ -43,29 +59,108 @@ pub struct SetPolicyArgs {
     pub daily_limit: Option<f64>,
 }
 
-#[derive(clap::Args)]
-pub struct WalletSettingsArgs {
-    /// Set the wallet display name
-    #[arg(long)]
-    pub display_name: Option<String>,
-}
-
-pub async fn run(action: WalletAction, ctx: Context) -> Result<()> {
+pub async fn run(action: OwsAction, ctx: Context) -> Result<()> {
     match action {
-        WalletAction::List => run_list(ctx).await,
-        WalletAction::Fund(args) => run_fund(args, ctx).await,
-        WalletAction::SetPolicy(args) => run_set_policy(args, ctx).await,
-        WalletAction::Settings(args) => run_settings(args, ctx).await,
+        OwsAction::Init(args) => run_init(args, ctx).await,
+        OwsAction::List => run_list(ctx).await,
+        OwsAction::Fund(args) => run_fund(args, ctx).await,
+        OwsAction::SetPolicy(args) => run_set_policy(args, ctx).await,
     }
 }
 
-/// Helper to extract a string field from a JSON value.
-fn json_str(v: &serde_json::Value, key: &str) -> String {
+/// Helper to extract a string from a JSON value.
+fn jstr(v: &serde_json::Value, key: &str) -> String {
     v.get(key)
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string()
 }
+
+// ── Init ─────────────────────────────────────────────────────────────
+
+async fn run_init(args: OwsInitArgs, ctx: Context) -> Result<()> {
+    let chain = args.chain.unwrap_or_else(ows::detect_chain);
+    let wallet_name = args.name.unwrap_or_else(ows::default_wallet_name);
+
+    ows::chain_to_caip2(&chain)?;
+
+    // Step 1: Check if OWS is installed
+    if !ows::is_ows_available() {
+        println!("OWS not detected. Installing via npm...");
+        ows::install_ows_via_npm()?;
+
+        if !ows::is_ows_available() {
+            return Err(anyhow::anyhow!(
+                "OWS installation failed. Install manually:\n  \
+                 npm install -g @open-wallet-standard/core\n  \
+                 Or use `pay init` for Pay's default signer."
+            ));
+        }
+        error::success("OWS installed");
+    }
+
+    // Step 2: Create wallet
+    println!("Creating wallet '{wallet_name}'...");
+    let wallet = ows::create_wallet(&wallet_name)?;
+    let address = ows::wallet_evm_address(&wallet)
+        .ok_or_else(|| anyhow::anyhow!("wallet has no EVM account"))?;
+    error::success(&format!("Wallet created: {address}"));
+
+    // Step 3: Create chain-lock policy
+    let policy = ows::create_chain_policy(&chain)?;
+    let policy_id = jstr(&policy, "id");
+    error::success(&format!(
+        "Policy created: {policy_id} (chain lock: {chain})"
+    ));
+
+    // Step 4: Create API key bound to wallet + policy
+    let wallet_id = jstr(&wallet, "id");
+    let key_result = ows::create_api_key(&wallet_id, &policy_id)?;
+    let token_field = jstr(&key_result, "token");
+    let token = if token_field.is_empty() {
+        jstr(&key_result, "api_key")
+    } else {
+        token_field
+    };
+    error::success("API key created");
+
+    // Step 5: Output
+    if ctx.json {
+        error::print_json(&serde_json::json!({
+            "wallet_id": wallet_id,
+            "wallet_name": jstr(&wallet, "name"),
+            "address": address,
+            "chain": chain,
+            "policy_id": policy_id,
+            "api_key": token,
+            "mcp_config": serde_json::from_str::<serde_json::Value>(
+                &ows::mcp_config_json(&wallet_name, &chain)
+            ).unwrap_or_default(),
+        }));
+    } else {
+        println!();
+        error::print_kv(&[
+            ("Wallet", &wallet_name),
+            ("Address", &address),
+            ("Chain", &chain),
+            ("Policy", &policy_id),
+            ("Vault", &ows::vault_path_display()),
+        ]);
+        println!();
+        eprintln!("API Key (save this — shown once):");
+        eprintln!("  {token}");
+        println!();
+        eprintln!("MCP config (add to your claude_desktop_config.json):");
+        eprintln!("{}", ows::mcp_config_json(&wallet_name, &chain));
+        println!();
+        eprintln!("Set OWS_API_KEY={token} in your environment.");
+        eprintln!("Then your agent can use Pay via MCP with OWS-secured signing.");
+    }
+
+    Ok(())
+}
+
+// ── List ─────────────────────────────────────────────────────────────
 
 async fn run_list(ctx: Context) -> Result<()> {
     let wallets = ows::list_wallets()?;
@@ -74,7 +169,7 @@ async fn run_list(ctx: Context) -> Result<()> {
         if ctx.json {
             error::print_json(&serde_json::json!([]));
         } else {
-            println!("No OWS wallets found. Run `pay init --ows` to create one.");
+            println!("No OWS wallets found. Run `pay ows init` to create one.");
         }
         return Ok(());
     }
@@ -85,10 +180,10 @@ async fn run_list(ctx: Context) -> Result<()> {
             .map(|w| {
                 let address = ows::wallet_evm_address(w).unwrap_or_default();
                 serde_json::json!({
-                    "id": json_str(w, "id"),
-                    "name": json_str(w, "name"),
+                    "id": jstr(w, "id"),
+                    "name": jstr(w, "name"),
                     "address": address,
-                    "created_at": json_str(w, "createdAt"),
+                    "created_at": jstr(w, "createdAt"),
                 })
             })
             .collect();
@@ -98,17 +193,17 @@ async fn run_list(ctx: Context) -> Result<()> {
         table.set_header(vec!["Name", "Address", "ID", "Created"]);
         for w in &wallets {
             let address = ows::wallet_evm_address(w).unwrap_or_else(|| "\u{2014}".to_string());
-            let id = json_str(w, "id");
+            let id = jstr(w, "id");
             let short_id = if id.len() > 8 {
                 format!("{}...", &id[..8])
             } else {
                 id
             };
             table.add_row(vec![
-                json_str(w, "name"),
+                jstr(w, "name"),
                 address,
                 short_id,
-                json_str(w, "createdAt"),
+                jstr(w, "createdAt"),
             ]);
         }
         println!("{table}");
@@ -117,7 +212,9 @@ async fn run_list(ctx: Context) -> Result<()> {
     Ok(())
 }
 
-async fn run_fund(args: WalletFundArgs, ctx: Context) -> Result<()> {
+// ── Fund ─────────────────────────────────────────────────────────────
+
+async fn run_fund(args: OwsFundArgs, ctx: Context) -> Result<()> {
     let wallet_name = args
         .wallet
         .or_else(|| std::env::var("OWS_WALLET_ID").ok())
@@ -128,7 +225,7 @@ async fn run_fund(args: WalletFundArgs, ctx: Context) -> Result<()> {
     let wallet = ows::get_wallet(&wallet_name)?;
     let address = ows::wallet_evm_address(&wallet)
         .ok_or_else(|| anyhow::anyhow!("wallet has no EVM account"))?;
-    let name = json_str(&wallet, "name");
+    let name = jstr(&wallet, "name");
 
     let base = if ctx.config.is_testnet() {
         "https://testnet.pay-skill.com"
@@ -162,6 +259,8 @@ async fn run_fund(args: WalletFundArgs, ctx: Context) -> Result<()> {
     Ok(())
 }
 
+// ── Set Policy ───────────────────────────────────────────────────────
+
 async fn run_set_policy(args: SetPolicyArgs, ctx: Context) -> Result<()> {
     let chain = args.chain.unwrap_or_else(ows::detect_chain);
     ows::chain_to_caip2(&chain)?;
@@ -186,8 +285,8 @@ async fn run_set_policy(args: SetPolicyArgs, ctx: Context) -> Result<()> {
         ows::create_chain_policy(&chain)?
     };
 
-    let policy_id = json_str(&policy, "id");
-    let policy_name = json_str(&policy, "name");
+    let policy_id = jstr(&policy, "id");
+    let policy_name = jstr(&policy, "name");
 
     if ctx.json {
         error::print_json(&serde_json::json!({
@@ -224,21 +323,6 @@ async fn run_set_policy(args: SetPolicyArgs, ctx: Context) -> Result<()> {
             println!("Spending limits use the @pay-skill/ows-policy executable.");
             println!("Install it: npm install -g @pay-skill/ows-policy");
         }
-    }
-
-    Ok(())
-}
-
-async fn run_settings(args: WalletSettingsArgs, ctx: Context) -> Result<()> {
-    if ctx.json {
-        error::print_json(&serde_json::json!({
-            "display_name": args.display_name,
-        }));
-    } else {
-        error::print_kv(&[(
-            "Display Name",
-            args.display_name.as_deref().unwrap_or("(not set)"),
-        )]);
     }
 
     Ok(())

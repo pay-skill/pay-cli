@@ -1,10 +1,11 @@
 pub mod direct;
 pub mod init;
+pub mod key;
+pub mod ows_cmd;
 pub mod request;
 pub mod sign;
 pub mod status;
 pub mod tab;
-pub mod wallet;
 pub mod webhook;
 
 use anyhow::{bail, Result};

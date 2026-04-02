@@ -54,9 +54,16 @@ enum Commands {
     Webhook(commands::webhook::WebhookArgs),
     /// Signer subprocess (stdin/stdout protocol for SDKs)
     Sign(commands::sign::SignArgs),
-    /// OWS wallet management (list, fund, set-policy, settings)
-    #[command(subcommand)]
-    Wallet(commands::wallet::WalletAction),
+    /// OWS (Open Wallet Standard) wallet management
+    Ows {
+        #[command(subcommand)]
+        action: commands::ows_cmd::OwsAction,
+    },
+    /// Plain private key management (dev/testing)
+    Key {
+        #[command(subcommand)]
+        action: commands::key::KeyAction,
+    },
     /// Show wallet address
     Address,
     /// Open funding page
@@ -106,7 +113,8 @@ async fn main() -> Result<()> {
         Commands::Request(args) => commands::request::run(args, ctx).await,
         Commands::Webhook(args) => commands::webhook::run(args, ctx).await,
         Commands::Sign(args) => commands::sign::run(args, ctx).await,
-        Commands::Wallet(action) => commands::wallet::run(action, ctx).await,
+        Commands::Ows { action } => commands::ows_cmd::run(action, ctx).await,
+        Commands::Key { action } => commands::key::run(action, ctx).await,
         Commands::Address => {
             commands::require_init()?;
             let addr = ctx.address()?;

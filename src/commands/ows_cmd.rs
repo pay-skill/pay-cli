@@ -51,11 +51,11 @@ pub struct SetPolicyArgs {
     pub chain: Option<String>,
 
     /// Per-transaction spending cap in USDC (e.g., 500)
-    #[arg(long)]
+    #[arg(long, allow_hyphen_values = true)]
     pub max_tx: Option<f64>,
 
     /// Daily spending cap in USDC (e.g., 5000)
-    #[arg(long)]
+    #[arg(long, allow_hyphen_values = true)]
     pub daily_limit: Option<f64>,
 }
 

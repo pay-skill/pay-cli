@@ -8,6 +8,7 @@ use clap::{Args, Subcommand};
 use std::io::IsTerminal;
 
 use crate::auth;
+use crate::config::Config;
 use crate::signer::{keyring, keystore, password};
 
 #[derive(Subcommand)]
@@ -107,6 +108,10 @@ fn run_init(args: SignerInitArgs) -> Result<()> {
         };
         meta.write_to_disk()?;
 
+        if !Config::is_initialized() {
+            Config::default().save()?;
+        }
+
         eprintln!("Wallet '{}' created: {address}", args.name);
         eprintln!("Key stored in OS keychain (encrypted by your login).");
         eprintln!("No password or env vars needed.");
@@ -115,6 +120,10 @@ fn run_init(args: SignerInitArgs) -> Result<()> {
         let pw = password::acquire_for_encrypt()?;
         let ks = keystore::Keystore::open()?;
         let address = ks.generate(&args.name, &pw)?;
+
+        if !Config::is_initialized() {
+            Config::default().save()?;
+        }
 
         eprintln!("Wallet '{}' created: {address}", args.name);
         if args.no_keychain {

@@ -69,7 +69,7 @@ pub async fn run(args: InitArgs, _ctx: super::Context) -> Result<()> {
             .map_err(|_| anyhow::anyhow!("failed to create signing key"))?;
         let address = auth::derive_address(&key);
 
-        keyring::store_key("default", &*raw)?;
+        keyring::store_key("default", &raw)?;
 
         let meta = keyring::MetaFile {
             version: 2,

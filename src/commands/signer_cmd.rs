@@ -97,7 +97,7 @@ fn run_init(args: SignerInitArgs) -> Result<()> {
             .map_err(|_| anyhow::anyhow!("failed to create signing key"))?;
         let address = auth::derive_address(&key);
 
-        keyring::store_key(&args.name, &*raw)?;
+        keyring::store_key(&args.name, &raw)?;
 
         let meta = keyring::MetaFile {
             version: 2,
@@ -161,7 +161,7 @@ fn run_import(args: SignerImportArgs) -> Result<()> {
     let use_keychain = !args.no_keychain && keyring::is_available();
 
     if use_keychain {
-        keyring::store_key(&args.name, &*raw)?;
+        keyring::store_key(&args.name, &raw)?;
 
         let meta = keyring::MetaFile {
             version: 2,
@@ -216,7 +216,7 @@ fn run_export(args: SignerExportArgs) -> Result<()> {
         if let Ok(meta) = keyring::MetaFile::load(&args.name) {
             if meta.storage == "keychain" {
                 let raw = keyring::load_key(&args.name)?;
-                let hex = format!("0x{}", hex::encode(&*raw));
+                let hex = format!("0x{}", hex::encode(&raw));
                 println!("{hex}");
                 return Ok(());
             }

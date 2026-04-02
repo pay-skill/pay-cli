@@ -148,7 +148,9 @@ pub fn require_init() -> Result<()> {
     // Check for any of: env var, .meta (keychain), .enc (encrypted file), config
     let has_env = std::env::var("PAYSKILL_SIGNER_KEY").is_ok();
     let has_meta = crate::signer::keyring::MetaFile::exists("default").unwrap_or(false);
-    let has_enc = crate::keystore::key_exists();
+    let has_enc = crate::signer::keystore::Keystore::open()
+        .map(|ks| ks.exists("default"))
+        .unwrap_or(false);
     let has_config = Config::is_initialized();
 
     if !has_env && !has_meta && !has_enc && !has_config {

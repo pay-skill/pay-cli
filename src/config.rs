@@ -71,6 +71,31 @@ impl Config {
                 .is_some_and(|u| u.contains("testnet"))
     }
 
+    /// Human-readable network name.
+    pub fn network_name(&self) -> &str {
+        if self.is_testnet() {
+            "Base Sepolia (testnet)"
+        } else {
+            "Base (mainnet)"
+        }
+    }
+
+    /// Switch to testnet config. Clears router_address so bootstrap can re-fetch.
+    pub fn set_testnet(&mut self) {
+        self.testnet = Some(true);
+        self.chain_id = Some(84532);
+        self.api_url = Some("https://testnet.pay-skill.com/api/v1".to_string());
+        self.router_address = None; // re-fetched by bootstrap
+    }
+
+    /// Switch to mainnet config. Clears router_address so bootstrap can re-fetch.
+    pub fn set_mainnet(&mut self) {
+        self.testnet = Some(false);
+        self.chain_id = Some(8453);
+        self.api_url = Some("https://pay-skill.com/api/v1".to_string());
+        self.router_address = None; // re-fetched by bootstrap
+    }
+
     /// Check if config file exists (i.e., `pay init` has been run).
     pub fn is_initialized() -> bool {
         config_path().exists()

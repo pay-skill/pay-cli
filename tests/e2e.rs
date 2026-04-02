@@ -27,6 +27,8 @@ fn ensure_init() {
         if let Ok(key) = env::var("PAYSKILL_TESTNET_KEY") {
             cmd.env("PAYSKILL_SIGNER_KEY", &key);
         }
+        // Default is mainnet; tests run against testnet
+        cmd.arg("--api-url").arg(testnet_url());
         cmd.arg("init").assert().success();
     });
 }

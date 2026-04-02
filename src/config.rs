@@ -16,16 +16,14 @@ pub struct Config {
 }
 
 impl Config {
-    /// Get chain_id, defaulting to Base Sepolia testnet until mainnet is deployed.
+    /// Get chain_id, defaulting to Base mainnet.
     pub fn chain_id(&self) -> u64 {
-        self.chain_id.unwrap_or(84532)
+        self.chain_id.unwrap_or(8453)
     }
 
-    /// Get router address. Defaults to testnet router until mainnet is deployed.
+    /// Get router address. Fetched from server during init; no hardcoded fallback.
     pub fn router_address(&self) -> &str {
-        self.router_address
-            .as_deref()
-            .unwrap_or("0x24F26eCb1f46451994c59585817e87896749935D")
+        self.router_address.as_deref().unwrap_or("")
     }
 
     /// Load config from ~/.pay/config.toml. Returns default if file doesn't exist.
@@ -54,17 +52,17 @@ impl Config {
         Ok(())
     }
 
-    /// Get the effective API URL. Defaults to testnet until mainnet is deployed.
+    /// Get the effective API URL. Defaults to mainnet.
     pub fn api_url(&self) -> &str {
         self.api_url
             .as_deref()
-            .unwrap_or("https://testnet.pay-skill.com/api/v1")
+            .unwrap_or("https://pay-skill.com/api/v1")
     }
 
     /// Check if this config points at a testnet.
     pub fn is_testnet(&self) -> bool {
-        self.testnet.unwrap_or(false)
-            || self.chain_id == Some(84532)
+        self.chain_id == Some(84532)
+            || self.testnet == Some(true)
             || self
                 .api_url
                 .as_deref()
@@ -143,7 +141,7 @@ mod tests {
     #[test]
     fn test_default_api_url() {
         let config = Config::default();
-        assert_eq!(config.api_url(), "https://testnet.pay-skill.com/api/v1");
+        assert_eq!(config.api_url(), "https://pay-skill.com/api/v1");
     }
 
     #[test]

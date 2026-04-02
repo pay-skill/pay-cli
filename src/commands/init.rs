@@ -116,7 +116,9 @@ async fn run_ows(args: InitArgs, ctx: super::Context) -> Result<()> {
     // Step 3: Create chain-lock policy
     let policy = ows::create_chain_policy(&chain)?;
     let policy_id = jstr(&policy, "id");
-    error::success(&format!("Policy created: {policy_id} (chain lock: {chain})"));
+    error::success(&format!(
+        "Policy created: {policy_id} (chain lock: {chain})"
+    ));
 
     // Step 4: Create API key bound to wallet + policy
     let wallet_id = jstr(&wallet, "id");

@@ -97,8 +97,7 @@ async fn run_list(ctx: Context) -> Result<()> {
         let mut table = comfy_table::Table::new();
         table.set_header(vec!["Name", "Address", "ID", "Created"]);
         for w in &wallets {
-            let address =
-                ows::wallet_evm_address(w).unwrap_or_else(|| "\u{2014}".to_string());
+            let address = ows::wallet_evm_address(w).unwrap_or_else(|| "\u{2014}".to_string());
             let id = json_str(w, "id");
             let short_id = if id.len() > 8 {
                 format!("{}...", &id[..8])

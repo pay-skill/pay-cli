@@ -1,3 +1,9 @@
+//! `pay init` — default AES-256-GCM signer setup.
+//!
+//! For alternative signer paths, see:
+//! - `pay ows init` — OWS (Open Wallet Standard) wallet
+//! - `pay key init` — plain private key (dev/testing)
+
 use anyhow::Result;
 use clap::Args;
 
@@ -17,10 +23,18 @@ pub struct InitArgs;
 
 pub async fn run(_args: InitArgs, _ctx: super::Context) -> Result<()> {
     if Config::is_initialized() && keystore::key_exists() {
-        let key = keystore::resolve_key()?;
-        let addr = auth::derive_address(&key);
-        error::success(&format!("Already initialized. Wallet: {addr}"));
-        return Ok(());
+        match keystore::resolve_key() {
+            Ok(key) => {
+                let addr = auth::derive_address(&key);
+                error::success(&format!("Already initialized. Wallet: {addr}"));
+                return Ok(());
+            }
+            Err(_) => {
+                eprintln!("Wallet exists but PAYSKILL_SIGNER_KEY is not set.");
+                eprintln!("Set it to unlock your wallet, or delete ~/.pay/ to start fresh.");
+                return Ok(());
+            }
+        }
     }
 
     let key = keystore::generate_key()?;

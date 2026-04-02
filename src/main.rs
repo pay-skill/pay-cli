@@ -4,9 +4,10 @@ mod config;
 mod eip3009;
 #[allow(dead_code)]
 mod error;
-mod keystore;
+#[allow(dead_code)]
 mod ows;
 mod permit;
+mod signer;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -58,6 +59,11 @@ enum Commands {
     Ows {
         #[command(subcommand)]
         action: commands::ows_cmd::OwsAction,
+    },
+    /// Advanced wallet management (init, import, export)
+    Signer {
+        #[command(subcommand)]
+        action: commands::signer_cmd::SignerAction,
     },
     /// Plain private key management (dev/testing)
     Key {
@@ -113,6 +119,7 @@ async fn main() -> Result<()> {
         Commands::Request(args) => commands::request::run(args, ctx).await,
         Commands::Webhook(args) => commands::webhook::run(args, ctx).await,
         Commands::Sign(args) => commands::sign::run(args, ctx).await,
+        Commands::Signer { action } => commands::signer_cmd::run(action, ctx).await,
         Commands::Ows { action } => commands::ows_cmd::run(action, ctx).await,
         Commands::Key { action } => commands::key::run(action, ctx).await,
         Commands::Address => {

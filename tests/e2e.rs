@@ -483,18 +483,26 @@ fn address_returns_valid_format() {
 // error paths. No OWS installation required.
 
 #[test]
-fn init_help_shows_signer_alternatives() {
-    let output = Command::cargo_bin("pay")
+fn init_help_describes_default_signer() {
+    Command::cargo_bin("pay")
         .expect("binary not found")
         .args(["init", "--help"])
-        .output()
-        .expect("failed to run");
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    // init help should mention the other signer modes
-    assert!(
-        stdout.contains("ows") || stdout.contains("OWS") || stdout.contains("key"),
-        "pay init --help should reference alternative signer modes"
-    );
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("wallet").or(predicate::str::contains("signer")),
+        );
+}
+
+#[test]
+fn top_level_help_shows_ows_and_key() {
+    Command::cargo_bin("pay")
+        .expect("binary not found")
+        .args(["--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("ows"))
+        .stdout(predicate::str::contains("key"));
 }
 
 // ── pay ows ──────────────────────────────────────────────────────────

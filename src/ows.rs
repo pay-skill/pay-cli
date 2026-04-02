@@ -186,8 +186,8 @@ pub fn create_chain_policy(chain: &str) -> Result<Value> {
         "action": "deny"
     });
 
-    let tmp = tempfile::NamedTempFile::with_suffix(".json")
-        .context("failed to create temp file")?;
+    let tmp =
+        tempfile::NamedTempFile::with_suffix(".json").context("failed to create temp file")?;
     std::fs::write(tmp.path(), serde_json::to_string_pretty(&policy)?)
         .context("failed to write policy file")?;
 
@@ -212,10 +212,7 @@ pub fn create_spending_policy(
         config.insert("max_tx_usdc".to_string(), serde_json::json!(max_tx));
     }
     if let Some(daily) = daily_limit_usdc {
-        config.insert(
-            "daily_limit_usdc".to_string(),
-            serde_json::json!(daily),
-        );
+        config.insert("daily_limit_usdc".to_string(), serde_json::json!(daily));
     }
 
     let policy = serde_json::json!({
@@ -232,8 +229,8 @@ pub fn create_spending_policy(
         "action": "deny"
     });
 
-    let tmp = tempfile::NamedTempFile::with_suffix(".json")
-        .context("failed to create temp file")?;
+    let tmp =
+        tempfile::NamedTempFile::with_suffix(".json").context("failed to create temp file")?;
     std::fs::write(tmp.path(), serde_json::to_string_pretty(&policy)?)
         .context("failed to write policy file")?;
 
@@ -261,13 +258,11 @@ pub fn create_api_key(wallet_id: &str, policy_id: &str) -> Result<String> {
 /// Parse the API token from `ows key create` stdout.
 /// Looks for "ows_key_..." in the output.
 pub fn parse_api_token(stdout: &str) -> Option<String> {
-    stdout
-        .lines()
-        .find_map(|line| {
-            line.split_whitespace()
-                .find(|word| word.starts_with("ows_key_"))
-                .map(|s| s.to_string())
-        })
+    stdout.lines().find_map(|line| {
+        line.split_whitespace()
+            .find(|word| word.starts_with("ows_key_"))
+            .map(|s| s.to_string())
+    })
 }
 
 // ── MCP config ──────────────────────────────────────────────────────

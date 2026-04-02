@@ -242,10 +242,22 @@ mod tests {
 
         let json = serde_json::to_string(&meta).unwrap();
 
-        assert!(!json.contains("private_key"), "meta file must not contain 'private_key'");
-        assert!(!json.contains("password"), "meta file must not contain 'password'");
-        assert!(!json.contains("secret"), "meta file must not contain 'secret'");
-        assert!(!json.contains("ciphertext"), "meta file must not contain 'ciphertext'");
+        assert!(
+            !json.contains("private_key"),
+            "meta file must not contain 'private_key'"
+        );
+        assert!(
+            !json.contains("password"),
+            "meta file must not contain 'password'"
+        );
+        assert!(
+            !json.contains("secret"),
+            "meta file must not contain 'secret'"
+        );
+        assert!(
+            !json.contains("ciphertext"),
+            "meta file must not contain 'ciphertext'"
+        );
     }
 
     #[test]

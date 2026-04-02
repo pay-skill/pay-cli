@@ -200,8 +200,7 @@ fn run_set_policy(args: SetPolicyArgs) -> Result<()> {
     let wallet = ows::get_wallet(&wallet_name)?;
     let wallet_id = jstr(&wallet, "id");
 
-    let policy =
-        ows::create_spending_policy(&args.chain, Some(max_tx), Some(daily))?;
+    let policy = ows::create_spending_policy(&args.chain, Some(max_tx), Some(daily))?;
     let policy_id = jstr(&policy, "id");
 
     let key_stdout = ows::create_api_key(&wallet_id, &policy_id)?;

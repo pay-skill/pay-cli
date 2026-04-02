@@ -589,7 +589,14 @@ fn ows_set_policy_rejects_invalid_chain() {
     let output = Command::cargo_bin("pay")
         .expect("binary not found")
         .args([
-            "ows", "set-policy", "--chain", "ethereum", "--max-tx", "10", "--daily-limit", "100",
+            "ows",
+            "set-policy",
+            "--chain",
+            "ethereum",
+            "--max-tx",
+            "10",
+            "--daily-limit",
+            "100",
         ])
         .output()
         .expect("failed to run");
@@ -605,7 +612,14 @@ fn ows_set_policy_rejects_invalid_chain() {
 fn ows_set_policy_rejects_negative_max_tx() {
     let output = Command::cargo_bin("pay")
         .expect("binary not found")
-        .args(["ows", "set-policy", "--max-tx", "-5", "--daily-limit", "100"])
+        .args([
+            "ows",
+            "set-policy",
+            "--max-tx",
+            "-5",
+            "--daily-limit",
+            "100",
+        ])
         .output()
         .expect("failed to run");
     assert!(!output.status.success());
@@ -620,7 +634,14 @@ fn ows_set_policy_rejects_negative_max_tx() {
 fn ows_set_policy_rejects_negative_daily_limit() {
     let output = Command::cargo_bin("pay")
         .expect("binary not found")
-        .args(["ows", "set-policy", "--daily-limit", "-100", "--max-tx", "10"])
+        .args([
+            "ows",
+            "set-policy",
+            "--daily-limit",
+            "-100",
+            "--max-tx",
+            "10",
+        ])
         .output()
         .expect("failed to run");
     assert!(!output.status.success());

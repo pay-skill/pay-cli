@@ -66,8 +66,11 @@ fn run_init(args: KeyInitArgs) -> Result<()> {
         "address": address,
         "private_key": private_key_hex,
     });
-    println!("{}", serde_json::to_string_pretty(&json)
-        .map_err(|e| anyhow::anyhow!("JSON serialization failed: {e}"))?);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&json)
+            .map_err(|e| anyhow::anyhow!("JSON serialization failed: {e}"))?
+    );
 
     Ok(())
 }

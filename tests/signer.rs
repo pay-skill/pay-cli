@@ -118,7 +118,13 @@ fn signer_import_invalid_hex_fails() {
 
     let mut cmd = pay_cmd(&keys_path, home.path());
     cmd.env("PAYSKILL_SIGNER_KEY", TEST_PASSWORD);
-    cmd.args(["signer", "import", "--key", "not-hex-at-all", "--no-keychain"]);
+    cmd.args([
+        "signer",
+        "import",
+        "--key",
+        "not-hex-at-all",
+        "--no-keychain",
+    ]);
     cmd.assert().failure();
 }
 
@@ -165,7 +171,11 @@ fn sign_with_raw_hex_key() {
     let output = cmd.assert().success();
     let stdout = String::from_utf8(output.get_output().stdout.clone()).unwrap();
     // Signature should be 130 hex chars (65 bytes)
-    assert_eq!(stdout.trim().len(), 130, "signature should be 130 hex chars");
+    assert_eq!(
+        stdout.trim().len(),
+        130,
+        "signature should be 130 hex chars"
+    );
 }
 
 #[test]
@@ -200,9 +210,9 @@ fn no_key_configured_shows_init_message() {
     cmd.env_remove("PAYSKILL_SIGNER_KEY");
     cmd.arg("address");
 
-    cmd.assert()
-        .failure()
-        .stderr(predicate::str::contains("pay init").or(predicate::str::contains("not initialized")));
+    cmd.assert().failure().stderr(
+        predicate::str::contains("pay init").or(predicate::str::contains("not initialized")),
+    );
 }
 
 #[test]

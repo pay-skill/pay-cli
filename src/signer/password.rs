@@ -110,7 +110,9 @@ mod tests {
         assert!(!is_raw_hex_key("my-password-123"));
         assert!(!is_raw_hex_key("short-hex-abcdef"));
         assert!(!is_raw_hex_key("")); // empty
-        assert!(!is_raw_hex_key("zzzz0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")); // non-hex chars
+        assert!(!is_raw_hex_key(
+            "zzzz0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+        )); // non-hex chars
     }
 
     #[test]

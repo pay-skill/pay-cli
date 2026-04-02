@@ -47,7 +47,9 @@ pub async fn run(args: InitArgs, _ctx: super::Context) -> Result<()> {
                 }
                 Err(_) => {
                     eprintln!("Wallet exists but cannot resolve key.");
-                    eprintln!("Set PAYSKILL_SIGNER_KEY to unlock, or delete ~/.pay/ to start fresh.");
+                    eprintln!(
+                        "Set PAYSKILL_SIGNER_KEY to unlock, or delete ~/.pay/ to start fresh."
+                    );
                     return Ok(());
                 }
             }

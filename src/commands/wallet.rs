@@ -59,6 +59,14 @@ pub async fn run(action: WalletAction, ctx: Context) -> Result<()> {
     }
 }
 
+/// Helper to extract a string field from a JSON value.
+fn json_str(v: &serde_json::Value, key: &str) -> String {
+    v.get(key)
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string()
+}
+
 async fn run_list(ctx: Context) -> Result<()> {
     let wallets = ows::list_wallets()?;
 
@@ -77,11 +85,10 @@ async fn run_list(ctx: Context) -> Result<()> {
             .map(|w| {
                 let address = ows::wallet_evm_address(w).unwrap_or_default();
                 serde_json::json!({
-                    "id": w.id,
-                    "name": w.name,
+                    "id": json_str(w, "id"),
+                    "name": json_str(w, "name"),
                     "address": address,
-                    "created_at": w.created_at,
-                    "accounts": w.accounts.len(),
+                    "created_at": json_str(w, "createdAt"),
                 })
             })
             .collect();
@@ -90,17 +97,19 @@ async fn run_list(ctx: Context) -> Result<()> {
         let mut table = comfy_table::Table::new();
         table.set_header(vec!["Name", "Address", "ID", "Created"]);
         for w in &wallets {
-            let address = ows::wallet_evm_address(w).unwrap_or_else(|| "\u{2014}".to_string());
-            let short_id = if w.id.len() > 8 {
-                format!("{}...", &w.id[..8])
+            let address =
+                ows::wallet_evm_address(w).unwrap_or_else(|| "\u{2014}".to_string());
+            let id = json_str(w, "id");
+            let short_id = if id.len() > 8 {
+                format!("{}...", &id[..8])
             } else {
-                w.id.clone()
+                id
             };
             table.add_row(vec![
-                w.name.clone(),
+                json_str(w, "name"),
                 address,
                 short_id,
-                w.created_at.clone(),
+                json_str(w, "createdAt"),
             ]);
         }
         println!("{table}");
@@ -110,7 +119,6 @@ async fn run_list(ctx: Context) -> Result<()> {
 }
 
 async fn run_fund(args: WalletFundArgs, ctx: Context) -> Result<()> {
-    // Resolve wallet
     let wallet_name = args
         .wallet
         .or_else(|| std::env::var("OWS_WALLET_ID").ok())
@@ -121,10 +129,9 @@ async fn run_fund(args: WalletFundArgs, ctx: Context) -> Result<()> {
     let wallet = ows::get_wallet(&wallet_name)?;
     let address = ows::wallet_evm_address(&wallet)
         .ok_or_else(|| anyhow::anyhow!("wallet has no EVM account"))?;
+    let name = json_str(&wallet, "name");
 
-    // Build the fund link URL
-    let is_testnet = ctx.config.is_testnet();
-    let base = if is_testnet {
+    let base = if ctx.config.is_testnet() {
         "https://testnet.pay-skill.com"
     } else {
         "https://pay-skill.com"
@@ -138,17 +145,16 @@ async fn run_fund(args: WalletFundArgs, ctx: Context) -> Result<()> {
     if ctx.json {
         error::print_json(&serde_json::json!({
             "url": url,
-            "wallet": wallet.name,
+            "wallet": name,
             "address": address,
         }));
     } else {
-        error::print_kv(&[("Wallet", &wallet.name), ("Address", &address)]);
+        error::print_kv(&[("Wallet", name.as_str()), ("Address", &address)]);
         println!();
         error::success(&format!("Fund link: {url}"));
         println!();
         println!("Open this link to add USDC to your wallet.");
 
-        // Try to open in browser
         if open_url(&url).is_err() {
             println!("(Could not open browser automatically)");
         }
@@ -159,14 +165,11 @@ async fn run_fund(args: WalletFundArgs, ctx: Context) -> Result<()> {
 
 async fn run_set_policy(args: SetPolicyArgs, ctx: Context) -> Result<()> {
     let chain = args.chain.unwrap_or_else(ows::detect_chain);
-
-    // Validate chain
     ows::chain_to_caip2(&chain)?;
 
     let has_limits = args.max_tx.is_some() || args.daily_limit.is_some();
 
     let policy = if has_limits {
-        // Validate positive amounts
         if let Some(max_tx) = args.max_tx {
             if max_tx <= 0.0 {
                 return Err(anyhow::anyhow!("--max-tx must be positive, got {max_tx}"));
@@ -179,26 +182,27 @@ async fn run_set_policy(args: SetPolicyArgs, ctx: Context) -> Result<()> {
                 ));
             }
         }
-
         ows::create_spending_policy(&chain, args.max_tx, args.daily_limit)?
     } else {
         ows::create_chain_policy(&chain)?
     };
 
+    let policy_id = json_str(&policy, "id");
+    let policy_name = json_str(&policy, "name");
+
     if ctx.json {
         error::print_json(&serde_json::json!({
-            "policy_id": policy.id,
-            "name": policy.name,
+            "policy_id": policy_id,
+            "name": policy_name,
             "chain": chain,
             "max_tx_usdc": args.max_tx,
             "daily_limit_usdc": args.daily_limit,
-            "rules": policy.rules.len(),
         }));
     } else {
-        error::success(&format!("Policy '{}' saved", policy.id));
+        error::success(&format!("Policy '{policy_id}' saved"));
         error::print_kv(&[
-            ("Policy ID", &policy.id),
-            ("Name", &policy.name),
+            ("Policy ID", policy_id.as_str()),
+            ("Name", policy_name.as_str()),
             ("Chain", &chain),
             (
                 "Max per-tx",

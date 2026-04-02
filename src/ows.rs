@@ -1,9 +1,12 @@
 //! OWS (Open Wallet Standard) integration helpers.
 //!
-//! Maps Pay chain names to CAIP-2 identifiers and provides
-//! convenience wrappers around ows-lib for the CLI.
+//! All OWS interaction goes through the `ows` CLI binary (subprocess).
+//! Nothing is compiled in — if OWS isn't installed, we detect that and
+//! give clear instructions. Pay's own signer is always priority #1.
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
+
+// ── Chain helpers ────────────────────────────────────────────────────
 
 /// Map a Pay chain name to its CAIP-2 identifier.
 pub fn chain_to_caip2(chain: &str) -> Result<String> {
@@ -42,83 +45,160 @@ pub fn default_wallet_name() -> String {
     format!("pay-{host}")
 }
 
-/// Pay contract addresses for Base Sepolia (for policy allowlists).
-/// TODO: populate once contracts are deployed.
-#[allow(dead_code)]
-pub const TESTNET_CONTRACTS: &[&str] = &[];
+// ── OWS CLI subprocess helpers ──────────────────────────────────────
 
-/// Pay contract addresses for Base Mainnet.
-/// TODO: populate once contracts are deployed.
-#[allow(dead_code)]
-pub const MAINNET_CONTRACTS: &[&str] = &[];
+/// Run an `ows` CLI command and return stdout as a string.
+/// Fails loud if ows is not installed or the command fails.
+fn run_ows(args: &[&str]) -> Result<String> {
+    let output = std::process::Command::new("ows")
+        .args(args)
+        .output()
+        .context(
+            "failed to run `ows` command. Is OWS installed?\n  \
+             Install: npm install -g @open-wallet-standard/core\n  \
+             Or: curl -fsSL https://openwallet.sh/install.sh | bash",
+        )?;
 
-/// Get contracts for a given chain name.
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        bail!("ows {} failed: {}", args.join(" "), stderr.trim());
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
+/// Run an `ows` CLI command and parse stdout as JSON.
+fn run_ows_json(args: &[&str]) -> Result<serde_json::Value> {
+    let stdout = run_ows(args)?;
+    serde_json::from_str(&stdout)
+        .with_context(|| format!("failed to parse ows output as JSON: {stdout}"))
+}
+
+// ── Availability ────────────────────────────────────────────────────
+
+/// Check if OWS CLI is installed by running `ows --version`.
+pub fn is_ows_available() -> bool {
+    std::process::Command::new("ows")
+        .arg("--version")
+        .output()
+        .is_ok_and(|o| o.status.success())
+}
+
+/// Get OWS CLI version string, if installed.
 #[allow(dead_code)]
-pub fn contracts_for_chain(chain: &str) -> &'static [&'static str] {
-    match chain {
-        "base" => MAINNET_CONTRACTS,
-        "base-sepolia" => TESTNET_CONTRACTS,
-        _ => &[],
+pub fn ows_cli_version() -> Option<String> {
+    std::process::Command::new("ows")
+        .arg("--version")
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_string())
+}
+
+/// Install OWS globally via npm (silent).
+pub fn install_ows_via_npm() -> Result<()> {
+    let status = std::process::Command::new("npm")
+        .args(["install", "-g", "@open-wallet-standard/core"])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .context("failed to run npm install")?;
+
+    if !status.success() {
+        bail!(
+            "npm install -g @open-wallet-standard/core failed (exit code: {})",
+            status.code().unwrap_or(-1)
+        );
+    }
+    Ok(())
+}
+
+// ── Wallet operations (subprocess) ──────────────────────────────────
+
+/// Create a wallet via `ows wallet create`.
+pub fn create_wallet(name: &str) -> Result<serde_json::Value> {
+    run_ows_json(&["wallet", "create", "--name", name])
+}
+
+/// Get a wallet by name or ID via `ows wallet list` + filter.
+pub fn get_wallet(name_or_id: &str) -> Result<serde_json::Value> {
+    let wallets = list_wallets()?;
+    wallets
+        .iter()
+        .find(|w| {
+            w.get("name").and_then(|v| v.as_str()) == Some(name_or_id)
+                || w.get("id").and_then(|v| v.as_str()) == Some(name_or_id)
+        })
+        .cloned()
+        .ok_or_else(|| anyhow!("OWS wallet not found: {name_or_id}"))
+}
+
+/// List all OWS wallets via `ows wallet list`.
+pub fn list_wallets() -> Result<Vec<serde_json::Value>> {
+    let output = run_ows_json(&["wallet", "list"])?;
+    match output {
+        serde_json::Value::Array(arr) => Ok(arr),
+        _ => Ok(vec![output]),
     }
 }
 
-/// Check if OWS is available by attempting to list wallets.
-pub fn is_ows_available() -> bool {
-    ows_lib::list_wallets(None).is_ok()
+/// Get the EVM address from a wallet JSON object.
+pub fn wallet_evm_address(wallet: &serde_json::Value) -> Option<String> {
+    let accounts = wallet.get("accounts")?.as_array()?;
+    accounts
+        .iter()
+        .find(|a| {
+            let chain = a
+                .get("chainId")
+                .or_else(|| a.get("chain_id"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            chain.starts_with("eip155:") || chain == "evm"
+        })
+        .and_then(|a| a.get("address").and_then(|v| v.as_str()))
+        .map(|s| s.to_string())
 }
 
-/// Create a wallet, returning wallet info. Errors if name already exists.
-pub fn create_wallet(name: &str) -> Result<ows_lib::WalletInfo> {
-    ows_lib::create_wallet(name, None, None, None)
-        .map_err(|e| anyhow!("failed to create OWS wallet: {e}"))
-}
+// ── Policy operations (subprocess) ──────────────────────────────────
 
-/// Get a wallet by name or ID.
-pub fn get_wallet(name_or_id: &str) -> Result<ows_lib::WalletInfo> {
-    ows_lib::get_wallet(name_or_id, None).map_err(|e| anyhow!("failed to get OWS wallet: {e}"))
-}
-
-/// List all OWS wallets.
-pub fn list_wallets() -> Result<Vec<ows_lib::WalletInfo>> {
-    ows_lib::list_wallets(None).map_err(|e| anyhow!("failed to list OWS wallets: {e}"))
-}
-
-/// Create an OWS policy with chain lock only (no spending limits).
-pub fn create_chain_policy(chain: &str) -> Result<ows_core::Policy> {
+/// Create a chain-lock policy via `ows policy create`.
+pub fn create_chain_policy(chain: &str) -> Result<serde_json::Value> {
     let caip2 = chain_to_caip2(chain)?;
     let id = format!("pay-{chain}");
-    let now = chrono::Utc::now().to_rfc3339();
 
-    let policy = ows_core::Policy {
-        id: id.clone(),
-        name: format!("Pay {chain} chain lock"),
-        version: 1,
-        created_at: now,
-        rules: vec![ows_core::PolicyRule::AllowedChains {
-            chain_ids: vec![caip2],
-        }],
-        executable: None,
-        config: None,
-        action: ows_core::PolicyAction::Deny,
-    };
+    // Build policy JSON and pass via stdin or temp file
+    let policy = serde_json::json!({
+        "id": id,
+        "name": format!("Pay {chain} chain lock"),
+        "rules": [{ "type": "allowed_chains", "chain_ids": [caip2] }],
+        "action": "deny"
+    });
 
-    ows_lib::policy_store::save_policy(&policy, None)
-        .map_err(|e| anyhow!("failed to save policy: {e}"))?;
+    let policy_str = serde_json::to_string(&policy)?;
+
+    let output = std::process::Command::new("ows")
+        .args(["policy", "create", "--json", &policy_str])
+        .output()
+        .context("failed to run ows policy create")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        bail!("ows policy create failed: {}", stderr.trim());
+    }
 
     Ok(policy)
 }
 
-/// Create an OWS policy with chain lock + spending limits.
+/// Create a spending policy with chain lock + limits.
 pub fn create_spending_policy(
     chain: &str,
     max_tx_usdc: Option<f64>,
     daily_limit_usdc: Option<f64>,
-) -> Result<ows_core::Policy> {
+) -> Result<serde_json::Value> {
     let caip2 = chain_to_caip2(chain)?;
     let id = format!("pay-{chain}-limits");
-    let now = chrono::Utc::now().to_rfc3339();
 
-    // Build config for the executable policy
     let mut config = serde_json::Map::new();
     config.insert("chain_ids".to_string(), serde_json::json!([&caip2]));
     if let Some(max_tx) = max_tx_usdc {
@@ -128,55 +208,48 @@ pub fn create_spending_policy(
         config.insert("daily_limit_usdc".to_string(), serde_json::json!(daily));
     }
 
-    // The executable is the pay-skill ows-policy npm package
-    let policy = ows_core::Policy {
-        id: id.clone(),
-        name: format!("Pay {chain} spending policy"),
-        version: 1,
-        created_at: now,
-        rules: vec![ows_core::PolicyRule::AllowedChains {
-            chain_ids: vec![caip2],
-        }],
-        executable: Some("npx @pay-skill/ows-policy".to_string()),
-        config: Some(serde_json::Value::Object(config)),
-        action: ows_core::PolicyAction::Deny,
-    };
+    let policy = serde_json::json!({
+        "id": id,
+        "name": format!("Pay {chain} spending policy"),
+        "rules": [{ "type": "allowed_chains", "chain_ids": [caip2] }],
+        "executable": "npx @pay-skill/ows-policy",
+        "config": config,
+        "action": "deny"
+    });
 
-    ows_lib::policy_store::save_policy(&policy, None)
-        .map_err(|e| anyhow!("failed to save policy: {e}"))?;
+    let policy_str = serde_json::to_string(&policy)?;
+
+    let output = std::process::Command::new("ows")
+        .args(["policy", "create", "--json", &policy_str])
+        .output()
+        .context("failed to run ows policy create")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        bail!("ows policy create failed: {}", stderr.trim());
+    }
 
     Ok(policy)
 }
 
+// ── API key operations (subprocess) ─────────────────────────────────
+
 /// Create an API key bound to a wallet and policy.
-/// Returns the raw token (shown once) and the key metadata.
-pub fn create_api_key(wallet_id: &str, policy_id: &str) -> Result<(String, ows_core::ApiKeyFile)> {
-    // No passphrase — wallets created without passphrase use empty string
-    ows_lib::key_ops::create_api_key(
+/// Returns the parsed JSON output (includes the token shown once).
+pub fn create_api_key(wallet_id: &str, policy_id: &str) -> Result<serde_json::Value> {
+    run_ows_json(&[
+        "key",
+        "create",
+        "--wallet",
+        wallet_id,
+        "--policy",
+        policy_id,
+        "--name",
         "pay-agent",
-        &[wallet_id.to_string()],
-        &[policy_id.to_string()],
-        "",
-        None, // no expiry
-        None, // default vault
-    )
-    .map_err(|e| anyhow!("failed to create API key: {e}"))
+    ])
 }
 
-/// List all OWS policies.
-#[allow(dead_code)]
-pub fn list_policies() -> Result<Vec<ows_core::Policy>> {
-    ows_lib::policy_store::list_policies(None).map_err(|e| anyhow!("failed to list policies: {e}"))
-}
-
-/// Get the EVM address for a wallet.
-pub fn wallet_evm_address(wallet: &ows_lib::WalletInfo) -> Option<String> {
-    wallet
-        .accounts
-        .iter()
-        .find(|a| a.chain_id.starts_with("eip155:") || a.chain_id == "evm")
-        .map(|a| a.address.clone())
-}
+// ── Display helpers ─────────────────────────────────────────────────
 
 /// Generate the MCP config JSON for the user to add to their config.
 pub fn mcp_config_json(wallet_name: &str, chain: &str) -> String {
@@ -200,36 +273,6 @@ pub fn mcp_config_json(wallet_name: &str, chain: &str) -> String {
 pub fn vault_path_display() -> String {
     let home = dirs::home_dir().unwrap_or_default();
     home.join(".ows").display().to_string()
-}
-
-/// Check if OWS CLI is installed by running `ows --version`.
-#[allow(dead_code)]
-pub fn ows_cli_version() -> Option<String> {
-    std::process::Command::new("ows")
-        .arg("--version")
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .and_then(|o| String::from_utf8(o.stdout).ok())
-        .map(|s| s.trim().to_string())
-}
-
-/// Install OWS globally via npm (silent).
-pub fn install_ows_via_npm() -> Result<()> {
-    let status = std::process::Command::new("npm")
-        .args(["install", "-g", "@open-wallet-standard/core"])
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status()
-        .context("failed to run npm install")?;
-
-    if !status.success() {
-        return Err(anyhow!(
-            "npm install -g @open-wallet-standard/core failed (exit code: {})",
-            status.code().unwrap_or(-1)
-        ));
-    }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -282,33 +325,6 @@ mod tests {
         assert!(name.len() > 4, "wallet name must include hostname");
     }
 
-    // ── Contract address tests ───────────────────────────────────────────
-
-    #[test]
-    fn test_testnet_contracts_count() {
-        assert_eq!(TESTNET_CONTRACTS.len(), 0);
-    }
-
-    #[test]
-    fn test_mainnet_contracts_count() {
-        assert_eq!(MAINNET_CONTRACTS.len(), 0);
-    }
-
-    #[test]
-    fn test_contracts_for_chain_base() {
-        assert_eq!(contracts_for_chain("base").len(), 0);
-    }
-
-    #[test]
-    fn test_contracts_for_chain_testnet() {
-        assert_eq!(contracts_for_chain("base-sepolia").len(), 0);
-    }
-
-    #[test]
-    fn test_contracts_for_chain_unknown() {
-        assert!(contracts_for_chain("unknown").is_empty());
-    }
-
     // ── MCP config tests ─────────────────────────────────────────────────
 
     #[test]
@@ -348,57 +364,56 @@ mod tests {
 
     #[test]
     fn test_wallet_evm_address_found() {
-        let wallet = ows_lib::WalletInfo {
-            id: "test-id".to_string(),
-            name: "test-wallet".to_string(),
-            created_at: "2026-03-25T00:00:00Z".to_string(),
-            accounts: vec![ows_lib::AccountInfo {
-                chain_id: "eip155:8453".to_string(),
-                address: "0xdeadbeef".to_string(),
-                derivation_path: "m/44'/60'/0'/0/0".to_string(),
-            }],
-        };
+        let wallet = serde_json::json!({
+            "id": "test-id",
+            "name": "test-wallet",
+            "accounts": [{
+                "chainId": "eip155:8453",
+                "address": "0xdeadbeef",
+                "derivationPath": "m/44'/60'/0'/0/0"
+            }]
+        });
         assert_eq!(wallet_evm_address(&wallet), Some("0xdeadbeef".to_string()));
     }
 
     #[test]
     fn test_wallet_evm_address_evm_chain_id() {
-        let wallet = ows_lib::WalletInfo {
-            id: "test-id".to_string(),
-            name: "test-wallet".to_string(),
-            created_at: "2026-03-25T00:00:00Z".to_string(),
-            accounts: vec![ows_lib::AccountInfo {
-                chain_id: "evm".to_string(),
-                address: "0xcafe".to_string(),
-                derivation_path: "m/44'/60'/0'/0/0".to_string(),
-            }],
-        };
+        let wallet = serde_json::json!({
+            "id": "test-id",
+            "name": "test-wallet",
+            "accounts": [{ "chainId": "evm", "address": "0xcafe" }]
+        });
         assert_eq!(wallet_evm_address(&wallet), Some("0xcafe".to_string()));
     }
 
     #[test]
+    fn test_wallet_evm_address_snake_case_key() {
+        // OWS may return snake_case depending on version
+        let wallet = serde_json::json!({
+            "id": "test-id",
+            "name": "test-wallet",
+            "accounts": [{ "chain_id": "eip155:8453", "address": "0xbeef" }]
+        });
+        assert_eq!(wallet_evm_address(&wallet), Some("0xbeef".to_string()));
+    }
+
+    #[test]
     fn test_wallet_evm_address_not_found() {
-        let wallet = ows_lib::WalletInfo {
-            id: "test-id".to_string(),
-            name: "test-wallet".to_string(),
-            created_at: "2026-03-25T00:00:00Z".to_string(),
-            accounts: vec![ows_lib::AccountInfo {
-                chain_id: "solana".to_string(),
-                address: "SolAddr123".to_string(),
-                derivation_path: "m/44'/501'/0'/0'".to_string(),
-            }],
-        };
+        let wallet = serde_json::json!({
+            "id": "test-id",
+            "name": "test-wallet",
+            "accounts": [{ "chainId": "solana", "address": "SolAddr123" }]
+        });
         assert_eq!(wallet_evm_address(&wallet), None);
     }
 
     #[test]
     fn test_wallet_evm_address_empty_accounts() {
-        let wallet = ows_lib::WalletInfo {
-            id: "test-id".to_string(),
-            name: "test-wallet".to_string(),
-            created_at: "2026-03-25T00:00:00Z".to_string(),
-            accounts: vec![],
-        };
+        let wallet = serde_json::json!({
+            "id": "test-id",
+            "name": "test-wallet",
+            "accounts": []
+        });
         assert_eq!(wallet_evm_address(&wallet), None);
     }
 
@@ -406,7 +421,6 @@ mod tests {
 
     #[test]
     fn test_ows_availability_does_not_panic() {
-        // This just verifies the function doesn't panic, regardless of OWS state
         let _ = is_ows_available();
     }
 }

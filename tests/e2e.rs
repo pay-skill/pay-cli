@@ -489,9 +489,7 @@ fn init_help_describes_default_signer() {
         .args(["init", "--help"])
         .assert()
         .success()
-        .stdout(
-            predicate::str::contains("wallet").or(predicate::str::contains("signer")),
-        );
+        .stdout(predicate::str::contains("wallet").or(predicate::str::contains("signer")));
 }
 
 #[test]

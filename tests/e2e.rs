@@ -282,7 +282,7 @@ fn webhook_crud() {
 
     // 1. Register
     let reg_output = pay()
-        .args(["webhook", "register", &hook_url])
+        .args(["webhook", "register", &hook_url, "--events", "payment.completed,tab.charged"])
         .output()
         .expect("failed to run webhook register");
     assert!(

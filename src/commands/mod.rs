@@ -1,6 +1,7 @@
 pub mod direct;
 pub mod init;
 pub mod key;
+pub mod link;
 pub mod ows_cmd;
 pub mod request;
 pub mod sign;

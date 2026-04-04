@@ -65,6 +65,8 @@ enum Commands {
         #[command(subcommand)]
         action: commands::signer_cmd::SignerAction,
     },
+    /// Link Pay agent to an external wallet (MetaMask, Coinbase, Phantom)
+    Link(commands::link::LinkArgs),
     /// Plain private key management (dev/testing)
     Key {
         #[command(subcommand)]
@@ -121,6 +123,7 @@ async fn main() -> Result<()> {
         Commands::Sign(args) => commands::sign::run(args, ctx).await,
         Commands::Signer { action } => commands::signer_cmd::run(action, ctx).await,
         Commands::Ows { action } => commands::ows_cmd::run(action, ctx).await,
+        Commands::Link(args) => commands::link::run(args, ctx).await,
         Commands::Key { action } => commands::key::run(action, ctx).await,
         Commands::Address => {
             commands::require_init()?;

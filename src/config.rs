@@ -21,11 +21,10 @@ impl Config {
         self.chain_id.unwrap_or(84532)
     }
 
-    /// Get router address. Defaults to testnet router until mainnet is deployed.
-    pub fn router_address(&self) -> &str {
-        self.router_address
-            .as_deref()
-            .unwrap_or("0xE0Aa45e6937F3b9Fc0BEe457361885Cb9bfC067F")
+    /// Get router address if explicitly configured (via config file or CLI flag).
+    /// Returns None if not set — callers should fetch from /contracts.
+    pub fn router_address(&self) -> Option<&str> {
+        self.router_address.as_deref()
     }
 
     /// Load config from ~/.pay/config.toml. Returns default if file doesn't exist.

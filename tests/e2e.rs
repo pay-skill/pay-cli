@@ -15,9 +15,27 @@ use std::sync::Once;
 static INIT: Once = Once::new();
 static LOCAL_INIT: Once = Once::new();
 
-// Testnet contract addresses (Base Sepolia).
+// Testnet chain ID (Base Sepolia).
 const TESTNET_CHAIN_ID: &str = "84532";
-const TESTNET_ROUTER: &str = "0xE0Aa45e6937F3b9Fc0BEe457361885Cb9bfC067F";
+
+/// Fetch router address from /contracts (cached for the test run).
+fn testnet_router() -> String {
+    use std::sync::OnceLock;
+    static ROUTER: OnceLock<String> = OnceLock::new();
+    ROUTER
+        .get_or_init(|| {
+            let url = format!("{}/contracts", testnet_url());
+            let resp: serde_json::Value = reqwest::blocking::get(&url)
+                .expect("GET /contracts failed — is the server reachable?")
+                .json()
+                .expect("GET /contracts returned invalid JSON");
+            resp["router"]
+                .as_str()
+                .expect("GET /contracts missing 'router' field")
+                .to_string()
+        })
+        .clone()
+}
 
 /// Ensure `pay init` has been run (idempotent, runs once per test suite).
 /// Only call from tests that have PAYSKILL_TESTNET_KEY set.
@@ -57,7 +75,7 @@ fn pay() -> Command {
     let mut cmd = Command::cargo_bin("pay").expect("binary not found");
     cmd.arg("--api-url").arg(testnet_url());
     cmd.arg("--chain-id").arg(TESTNET_CHAIN_ID);
-    cmd.arg("--router-address").arg(TESTNET_ROUTER);
+    cmd.arg("--router-address").arg(&testnet_router());
 
     // Map PAYSKILL_TESTNET_KEY → PAYSKILL_SIGNER_KEY so the CLI can sign.
     if let Ok(key) = env::var("PAYSKILL_TESTNET_KEY") {
@@ -87,7 +105,7 @@ fn pay_local() -> Command {
     // Use a dummy API URL — validation tests never reach the network
     cmd.arg("--api-url").arg("http://localhost:9999");
     cmd.arg("--chain-id").arg(TESTNET_CHAIN_ID);
-    cmd.arg("--router-address").arg(TESTNET_ROUTER);
+    cmd.arg("--router-address").arg(&testnet_router());
     cmd
 }
 
@@ -139,7 +157,7 @@ fn unsigned_request_rejected() {
     let mut cmd = Command::cargo_bin("pay").expect("binary not found");
     cmd.arg("--api-url").arg(testnet_url());
     cmd.arg("--chain-id").arg(TESTNET_CHAIN_ID);
-    cmd.arg("--router-address").arg(TESTNET_ROUTER);
+    cmd.arg("--router-address").arg(&testnet_router());
     // Deliberately remove PAYSKILL_SIGNER_KEY — no key means no auth.
     cmd.env_remove("PAYSKILL_SIGNER_KEY");
     cmd.args(["--json", "status"]);

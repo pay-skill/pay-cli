@@ -9,7 +9,7 @@ pub mod status;
 pub mod tab;
 pub mod webhook;
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context as _, Result};
 use k256::ecdsa::SigningKey;
 
 use crate::auth;
@@ -21,6 +21,7 @@ pub struct Context {
     pub config: Config,
     pub http: reqwest::Client,
     signing_key: Option<SigningKey>,
+    cached_router: Option<String>,
 }
 
 impl Context {
@@ -30,6 +31,7 @@ impl Context {
             config,
             http: reqwest::Client::new(),
             signing_key: None,
+            cached_router: None,
         }
     }
 
@@ -52,15 +54,42 @@ impl Context {
         self.config.api_url()
     }
 
-    /// Build auth headers for a request.
-    fn auth_headers(&mut self, method: &str, path: &str) -> Result<Vec<(String, String)>> {
-        let chain_id = self.config.chain_id();
-        let router = self.config.router_address().to_string();
-        if router.is_empty() {
-            bail!(
-                "router_address not set in config. Set ROUTER_ADDRESS or update ~/.pay/config.toml"
-            );
+    /// Resolve the router address. Uses config if set, otherwise fetches from /contracts.
+    pub async fn router_address(&mut self) -> Result<String> {
+        // 1. Explicit config or CLI flag
+        if let Some(addr) = &self.config.router_address {
+            if !addr.is_empty() {
+                return Ok(addr.clone());
+            }
         }
+        // 2. Cached from a prior fetch this session
+        if let Some(addr) = &self.cached_router {
+            return Ok(addr.clone());
+        }
+        // 3. Fetch from /contracts (unauthenticated)
+        let url = format!("{}/contracts", self.api_url());
+        let resp = self
+            .http
+            .get(&url)
+            .send()
+            .await
+            .context("failed to fetch /contracts — is the server reachable?")?;
+        if !resp.status().is_success() {
+            bail!("GET /contracts returned {}", resp.status());
+        }
+        let data: serde_json::Value = resp.json().await?;
+        let router = data["router"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("GET /contracts missing 'router' field"))?
+            .to_string();
+        self.cached_router = Some(router.clone());
+        Ok(router)
+    }
+
+    /// Build auth headers for a request.
+    async fn auth_headers(&mut self, method: &str, path: &str) -> Result<Vec<(String, String)>> {
+        let chain_id = self.config.chain_id();
+        let router = self.router_address().await?;
         let key = self.load_key()?;
         auth::build_auth_headers(key, method, path, chain_id, &router)
     }
@@ -88,7 +117,7 @@ impl Context {
     pub async fn get(&mut self, path: &str) -> Result<serde_json::Value> {
         let url = format!("{}{}", self.api_url(), path);
         let sign_path = self.full_path(path);
-        let headers = self.auth_headers("GET", &sign_path)?;
+        let headers = self.auth_headers("GET", &sign_path).await?;
         let mut req = self.http.get(&url);
         for (k, v) in &headers {
             req = req.header(k, v);
@@ -110,7 +139,7 @@ impl Context {
     ) -> Result<serde_json::Value> {
         let url = format!("{}{}", self.api_url(), path);
         let sign_path = self.full_path(path);
-        let headers = self.auth_headers("POST", &sign_path)?;
+        let headers = self.auth_headers("POST", &sign_path).await?;
         let mut req = self.http.post(&url).json(body);
         for (k, v) in &headers {
             req = req.header(k, v);
@@ -128,7 +157,7 @@ impl Context {
     pub async fn del(&mut self, path: &str) -> Result<()> {
         let url = format!("{}{}", self.api_url(), path);
         let sign_path = self.full_path(path);
-        let headers = self.auth_headers("DELETE", &sign_path)?;
+        let headers = self.auth_headers("DELETE", &sign_path).await?;
         let mut req = self.http.delete(&url);
         for (k, v) in &headers {
             req = req.header(k, v);

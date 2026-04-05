@@ -28,20 +28,11 @@ pub struct TransferAuthorization {
 }
 
 impl TransferAuthorization {
-    /// Encode as JSON for the x402 payment header.
-    pub fn to_json(&self) -> serde_json::Value {
-        serde_json::json!({
-            "from": self.from,
-            "to": self.to,
-            "amount": self.amount,
-            "settlement": "direct",
-            "valid_after": self.valid_after,
-            "valid_before": self.valid_before,
-            "nonce": self.nonce,
-            "v": self.v,
-            "r": self.r,
-            "s": self.s,
-        })
+    /// EIP-3009 signature as 65-byte hex: 0x + r(32) + s(32) + v(1).
+    pub fn combined_signature(&self) -> String {
+        let r_clean = self.r.strip_prefix("0x").unwrap_or(&self.r);
+        let s_clean = self.s.strip_prefix("0x").unwrap_or(&self.s);
+        format!("0x{}{}{:02x}", r_clean, s_clean, self.v)
     }
 }
 

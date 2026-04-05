@@ -419,16 +419,14 @@ fn x402_request_handles_402_and_pays() {
                     );
                     let _ = stream.write_all(resp.as_bytes());
                 } else {
-                    // V2: requirements in body AND base64-encoded in PAYMENT-REQUIRED header
-                    let requirements = format!(
-                        r#"{{"scheme":"exact","amount":1000000,"to":"{}","settlement":"direct","facilitator":"https://testnet.pay-skill.com/x402","maxChargePerCall":1000000,"network":"eip155:84532"}}"#,
+                    // V2: PAYMENT-REQUIRED header with x402 v2 format
+                    let v2_payload = format!(
+                        r#"{{"x402Version":2,"resource":{{"url":"http://localhost/content","mimeType":"application/json"}},"accepts":[{{"scheme":"exact","network":"eip155:84532","amount":"1000000","asset":"0x036CbD53842c5426634e7929541eC2318f3dCF7e","payTo":"{}","maxTimeoutSeconds":60,"extra":{{"name":"USDC","version":"2","facilitator":"https://testnet.pay-skill.com/x402","settlement":"direct"}}}}],"extensions":{{}}}}"#,
                         provider_addr()
                     );
                     use base64::Engine;
-                    let req_b64 = base64::engine::general_purpose::STANDARD.encode(&requirements);
-                    let body = format!(
-                        r#"{{"error":"payment_required","message":"This resource requires payment","requirements":{requirements}}}"#,
-                    );
+                    let req_b64 = base64::engine::general_purpose::STANDARD.encode(&v2_payload);
+                    let body = r#"{"error":"payment_required","message":"This resource requires payment"}"#;
                     let resp = format!(
                         "HTTP/1.1 402 Payment Required\r\nContent-Type: application/json\r\nContent-Length: {}\r\npayment-required: {}\r\nConnection: close\r\n\r\n{}",
                         body.len(),

@@ -264,8 +264,8 @@ fn run_backup(args: SignerBackupArgs) -> Result<()> {
     let raw = load_key_raw(&args.name)?;
 
     // Get address for the backup file metadata
-    let key = k256::ecdsa::SigningKey::from_slice(&*raw)
-        .map_err(|_| anyhow::anyhow!("invalid key"))?;
+    let key =
+        k256::ecdsa::SigningKey::from_slice(&*raw).map_err(|_| anyhow::anyhow!("invalid key"))?;
     let address = auth::derive_address(&key);
 
     // Prompt for backup encryption password
@@ -397,7 +397,5 @@ fn load_key_raw(name: &str) -> Result<zeroize::Zeroizing<[u8; 32]>> {
         return Ok(raw);
     }
 
-    bail!(
-        "No wallet '{name}' found. Check --name or run `pay init`."
-    );
+    bail!("No wallet '{name}' found. Check --name or run `pay init`.");
 }

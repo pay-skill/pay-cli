@@ -532,7 +532,13 @@ fn signer_backup_requires_interactive_terminal() {
 fn signer_restore_rejects_missing_file() {
     let mut cmd = Command::cargo_bin("pay").expect("binary not found");
     cmd.env("PAYSKILL_SIGNER_KEY", LOCAL_KEY);
-    cmd.args(["signer", "restore", "/nonexistent/path.enc", "--name", "restore-test"]);
+    cmd.args([
+        "signer",
+        "restore",
+        "/nonexistent/path.enc",
+        "--name",
+        "restore-test",
+    ]);
     cmd.assert()
         .failure()
         .stderr(predicate::str::contains("not found"));

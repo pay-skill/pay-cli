@@ -74,7 +74,14 @@ pub async fn run(args: RequestArgs, mut ctx: super::Context) -> Result<()> {
 
     // Initial request
     let req = build_request(
-        &client, &method, &args.url, &headers, &body, auto_ct, args.max_time, &[],
+        &client,
+        &method,
+        &args.url,
+        &headers,
+        &body,
+        auto_ct,
+        args.max_time,
+        &[],
     );
     let resp = req.send().await?;
 
@@ -108,9 +115,9 @@ pub async fn run(args: RequestArgs, mut ctx: super::Context) -> Result<()> {
             .as_array()
             .cloned()
             .unwrap_or_default();
-        let tab = tabs
-            .iter()
-            .find(|t| t["provider"].as_str() == Some(to.as_str()) && t["status"].as_str() == Some("open"));
+        let tab = tabs.iter().find(|t| {
+            t["provider"].as_str() == Some(to.as_str()) && t["status"].as_str() == Some("open")
+        });
 
         let tab_id = if let Some(t) = tab {
             t["id"].as_str().unwrap_or("").to_string()
@@ -178,10 +185,7 @@ pub async fn run(args: RequestArgs, mut ctx: super::Context) -> Result<()> {
     }
 
     // Retry with same method/headers/body + PAYMENT-SIGNATURE
-    let extra = [(
-        "PAYMENT-SIGNATURE".to_string(),
-        encoded_payload,
-    )];
+    let extra = [("PAYMENT-SIGNATURE".to_string(), encoded_payload)];
 
     if args.verbose {
         eprintln!("> [retry with PAYMENT-SIGNATURE]");
@@ -189,7 +193,14 @@ pub async fn run(args: RequestArgs, mut ctx: super::Context) -> Result<()> {
     }
 
     let retry_req = build_request(
-        &client, &method, &args.url, &headers, &body, auto_ct, args.max_time, &extra,
+        &client,
+        &method,
+        &args.url,
+        &headers,
+        &body,
+        auto_ct,
+        args.max_time,
+        &extra,
     );
     let retry_resp = retry_req.send().await?;
 

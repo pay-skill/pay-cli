@@ -29,7 +29,7 @@ pub fn verify_identity(reason: &str) -> Result<()> {
 
     #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     {
-        return verify_password_fallback(reason);
+        verify_password_fallback(reason)
     }
 }
 
@@ -130,7 +130,7 @@ fn verify_macos(reason: &str) -> Result<()> {
 
 // ── Fallback: password re-entry ───────────────────────────────────
 
-#[allow(dead_code)]
+#[allow(dead_code, clippy::needless_return)]
 fn verify_password_fallback(reason: &str) -> Result<()> {
     eprintln!("Identity verification required: {reason}");
     eprintln!();

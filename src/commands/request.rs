@@ -266,6 +266,7 @@ fn build_client(args: &RequestArgs) -> Result<reqwest::Client> {
 }
 
 /// Assemble a RequestBuilder from resolved components.
+#[allow(clippy::too_many_arguments)]
 fn build_request(
     client: &reqwest::Client,
     method: &Method,

@@ -352,7 +352,7 @@ fn run_restore(args: SignerRestoreArgs) -> Result<()> {
         eprintln!("Key stored in OS keychain.");
     } else {
         let ks = keystore::Keystore::open()?;
-        let hex_key = format!("0x{}", hex::encode(&*raw));
+        let hex_key = format!("0x{}", hex::encode(*raw));
         // Re-encrypt with a new password for local storage
         eprintln!("Set a local password for this machine:");
         let local_pw = password::acquire_for_encrypt()?;
@@ -373,7 +373,7 @@ fn run_restore(args: SignerRestoreArgs) -> Result<()> {
 
 fn load_key_hex(name: &str) -> Result<String> {
     let raw = load_key_raw(name)?;
-    Ok(format!("0x{}", hex::encode(&*raw)))
+    Ok(format!("0x{}", hex::encode(*raw)))
 }
 
 fn load_key_raw(name: &str) -> Result<zeroize::Zeroizing<[u8; 32]>> {

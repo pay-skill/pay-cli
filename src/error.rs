@@ -3,14 +3,14 @@
 
 use std::io::{self, IsTerminal, Write};
 
-/// Print a success message to stdout: "✓ message"
+/// Print a success message to stdout.
 pub fn success(msg: &str) {
-    println!("\u{2713} {msg}");
+    println!("{msg}");
 }
 
-/// Print an error message to stderr: "✗ Error: message"
+/// Print an error message to stderr.
 pub fn error(msg: &str) {
-    eprintln!("\u{2717} Error: {msg}");
+    eprintln!("Error: {msg}");
 }
 
 /// Print key-value pairs as a simple indented list.

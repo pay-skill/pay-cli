@@ -192,23 +192,45 @@ fn run_export(args: SignerExportArgs) -> Result<()> {
         bail!("Export requires an interactive terminal for safety confirmation.");
     }
 
-    eprintln!("WARNING: This will display your private key in plaintext.");
-    eprintln!("Press Enter to continue, or Ctrl+C to cancel.");
-    let mut buf = String::new();
-    std::io::stdin()
-        .read_line(&mut buf)
-        .map_err(|e| anyhow::anyhow!("failed to read confirmation: {e}"))?;
+    // Verify identity via OS biometric/password before revealing the key.
+    // This MUST succeed — no fallback, no bypass.
+    crate::os_auth::verify_identity(
+        "Pay CLI needs to verify your identity to export the private key.",
+    )?;
 
-    // Resolve key source
+    // Load the key
+    let hex_key = load_key_for_export(&args)?;
+
+    // Copy to clipboard with auto-clear instead of printing to stdout
+    let clear_secs = 15;
+    if crate::os_auth::clipboard_copy_and_clear(&hex_key, clear_secs) {
+        eprintln!();
+        eprintln!("Private key copied to clipboard.");
+        eprintln!("Clipboard will auto-clear in {clear_secs} seconds.");
+        eprintln!();
+        eprintln!("DO NOT paste this anywhere except a wallet import screen.");
+
+        // Wait for clipboard to clear before exiting
+        std::thread::sleep(std::time::Duration::from_secs(clear_secs));
+        eprintln!("Clipboard cleared.");
+    } else {
+        // Clipboard unavailable — print to stdout as last resort
+        eprintln!("WARNING: Could not copy to clipboard. Printing to stdout.");
+        println!("{hex_key}");
+    }
+
+    Ok(())
+}
+
+/// Load the private key hex from whichever source is available.
+fn load_key_for_export(args: &SignerExportArgs) -> Result<String> {
+    // Explicit .enc file path
     if let Some(keystore_path) = &args.keystore {
-        // Explicit .enc file
         let path = std::path::PathBuf::from(keystore_path);
         let key_file = keystore::load_file(&path)?;
         let pw = password::acquire_for_decrypt()?;
         let key = keystore::decrypt(&key_file, &pw)?;
-        let hex = format!("0x{}", hex::encode(key.to_bytes()));
-        println!("{hex}");
-        return Ok(());
+        return Ok(format!("0x{}", hex::encode(key.to_bytes())));
     }
 
     // Try .meta (keychain) first
@@ -216,9 +238,7 @@ fn run_export(args: SignerExportArgs) -> Result<()> {
         if let Ok(meta) = keyring::MetaFile::load(&args.name) {
             if meta.storage == "keychain" {
                 let raw = keyring::load_key(&args.name)?;
-                let hex = format!("0x{}", hex::encode(&raw));
-                println!("{hex}");
-                return Ok(());
+                return Ok(format!("0x{}", hex::encode(&raw)));
             }
         }
     }
@@ -229,9 +249,7 @@ fn run_export(args: SignerExportArgs) -> Result<()> {
         let key_file = ks.load(&args.name)?;
         let pw = password::acquire_for_decrypt()?;
         let key = keystore::decrypt(&key_file, &pw)?;
-        let hex = format!("0x{}", hex::encode(key.to_bytes()));
-        println!("{hex}");
-        return Ok(());
+        return Ok(format!("0x{}", hex::encode(key.to_bytes())));
     }
 
     bail!(

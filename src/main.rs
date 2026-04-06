@@ -5,6 +5,8 @@ mod eip3009;
 #[allow(dead_code)]
 mod error;
 #[allow(dead_code)]
+mod os_auth;
+#[allow(dead_code)]
 mod ows;
 mod permit;
 mod signer;

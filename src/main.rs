@@ -75,6 +75,7 @@ enum Commands {
         action: commands::signer_cmd::SignerAction,
     },
     /// Plain private key management (dev/testing)
+    #[command(hide = true)]
     Key {
         #[command(subcommand)]
         action: commands::key::KeyAction,

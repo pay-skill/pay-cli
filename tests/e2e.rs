@@ -915,7 +915,10 @@ fn request_output_to_file() {
 #[test]
 fn request_post_with_body() {
     // Server echoes back whatever it receives (we just check it doesn't error)
-    let port = spawn_http_server(&http_response("200 OK", "application/json", r#"{"ok":true}"#), 1);
+    let port = spawn_http_server(
+        &http_response("200 OK", "application/json", r#"{"ok":true}"#),
+        1,
+    );
     let output = pay_local()
         .args([
             "request",
@@ -929,10 +932,7 @@ fn request_post_with_body() {
         .expect("failed to run");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(
-        stdout.contains("ok"),
-        "should get response, got: {stdout}"
-    );
+    assert!(stdout.contains("ok"), "should get response, got: {stdout}");
 }
 
 #[test]
@@ -1007,7 +1007,10 @@ fn request_at_file_body() {
     let input_file = dir.path().join("input.json");
     std::fs::write(&input_file, r#"{"from":"file"}"#).expect("write input file");
 
-    let port = spawn_http_server(&http_response("200 OK", "application/json", r#"{"ok":true}"#), 1);
+    let port = spawn_http_server(
+        &http_response("200 OK", "application/json", r#"{"ok":true}"#),
+        1,
+    );
     let output = pay_local()
         .args([
             "request",

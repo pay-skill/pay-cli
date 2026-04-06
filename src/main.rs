@@ -23,6 +23,10 @@ struct Cli {
     #[arg(long, global = true)]
     json: bool,
 
+    /// Use testnet (Base Sepolia) for this command only
+    #[arg(long, global = true)]
+    testnet: bool,
+
     /// Override API URL
     #[arg(long, global = true, env = "PAYSKILL_API_URL")]
     api_url: Option<String>,
@@ -101,6 +105,9 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     let mut config = Config::load()?;
+    if cli.testnet {
+        config.set_testnet();
+    }
     if let Some(url) = &cli.api_url {
         config.api_url = Some(url.clone());
     }

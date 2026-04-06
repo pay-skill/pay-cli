@@ -57,7 +57,9 @@ async fn switch_network(ctx: super::Context, testnet: bool) -> Result<()> {
 
     if let Err(e) = config.bootstrap_from_server().await {
         eprintln!("Warning: could not fetch config from server: {e}");
-        eprintln!("Router address will use default. Run `pay network` again when server is reachable.");
+        eprintln!(
+            "Router address will use default. Run `pay network` again when server is reachable."
+        );
     }
 
     config.save()?;

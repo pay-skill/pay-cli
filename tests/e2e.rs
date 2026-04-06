@@ -857,11 +857,7 @@ fn request_silent_mode() {
     let body = "silent-test-body";
     let port = spawn_http_server(&http_response("200 OK", "text/plain", body), 1);
     let output = pay_local()
-        .args([
-            "request",
-            "-s",
-            &format!("http://127.0.0.1:{port}/silent"),
-        ])
+        .args(["request", "-s", &format!("http://127.0.0.1:{port}/silent")])
         .output()
         .expect("failed to run");
     assert!(output.status.success());
@@ -873,11 +869,7 @@ fn request_silent_mode() {
 fn request_verbose_shows_headers() {
     let port = spawn_http_server(&http_response("200 OK", "text/plain", "ok"), 1);
     let output = pay_local()
-        .args([
-            "request",
-            "-v",
-            &format!("http://127.0.0.1:{port}/verbose"),
-        ])
+        .args(["request", "-v", &format!("http://127.0.0.1:{port}/verbose")])
         .output()
         .expect("failed to run");
     assert!(output.status.success());

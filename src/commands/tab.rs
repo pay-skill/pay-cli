@@ -187,7 +187,6 @@ async fn run_topup(args: TabTopupArgs, ctx: &mut super::Context) -> Result<()> {
     Ok(())
 }
 
-
 async fn run_list(ctx: &mut super::Context) -> Result<()> {
     let resp = ctx.get("/tabs").await?;
 

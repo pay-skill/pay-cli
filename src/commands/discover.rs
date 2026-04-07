@@ -54,14 +54,13 @@ pub async fn run(args: DiscoverArgs, ctx: super::Context) -> Result<()> {
             Some(svcs) => {
                 // Table header
                 println!(
-                    "{:<30} {:<25} {:<10} {:<10} {:<10}",
-                    "NAME", "DOMAIN", "PRICE", "CALLS/DAY", "SETTLEMENT"
+                    "{:<30} {:<40} {:<10} {:<10}",
+                    "NAME", "BASE URL", "PRICE", "SETTLEMENT"
                 );
-                println!("{}", "-".repeat(85));
+                println!("{}", "-".repeat(90));
                 for svc in svcs {
                     let name = svc["name"].as_str().unwrap_or("");
-                    let domain = svc["domain"].as_str().unwrap_or("");
-                    let daily = svc["daily_calls"].as_i64().unwrap_or(0);
+                    let base_url = svc["base_url"].as_str().unwrap_or("");
                     let settlement = svc["settlement_mode"].as_str().unwrap_or("");
 
                     // Extract lowest price from routes
@@ -71,11 +70,10 @@ pub async fn run(args: DiscoverArgs, ctx: super::Context) -> Result<()> {
                         .unwrap_or("-");
 
                     println!(
-                        "{:<30} {:<25} {:<10} {:<10} {:<10}",
+                        "{:<30} {:<40} {:<10} {:<10}",
                         truncate(name, 29),
-                        truncate(domain, 24),
+                        truncate(base_url, 39),
                         price,
-                        daily,
                         settlement,
                     );
                 }

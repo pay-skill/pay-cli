@@ -19,8 +19,6 @@ pub enum TabAction {
     Charge(TabChargeArgs),
     /// Add funds to an open tab
     Topup(TabTopupArgs),
-    /// Withdraw earned charges from a tab (provider-side)
-    Withdraw(TabWithdrawArgs),
     /// List open tabs
     List,
 }
@@ -58,12 +56,6 @@ pub struct TabTopupArgs {
     pub amount: String,
 }
 
-#[derive(Args)]
-pub struct TabWithdrawArgs {
-    /// Tab ID
-    pub tab_id: String,
-}
-
 pub async fn run(args: TabArgs, mut ctx: super::Context) -> Result<()> {
     super::require_init()?;
 
@@ -72,7 +64,6 @@ pub async fn run(args: TabArgs, mut ctx: super::Context) -> Result<()> {
         TabAction::Close(a) => run_close(a, &mut ctx).await,
         TabAction::Charge(a) => run_charge(a, &mut ctx).await,
         TabAction::Topup(a) => run_topup(a, &mut ctx).await,
-        TabAction::Withdraw(a) => run_withdraw(a, &mut ctx).await,
         TabAction::List => run_list(&mut ctx).await,
     }
 }
@@ -196,28 +187,6 @@ async fn run_topup(args: TabTopupArgs, ctx: &mut super::Context) -> Result<()> {
     Ok(())
 }
 
-async fn run_withdraw(args: TabWithdrawArgs, ctx: &mut super::Context) -> Result<()> {
-    let resp = ctx
-        .post(
-            &format!("/tabs/{}/withdraw", args.tab_id),
-            &serde_json::json!({}),
-        )
-        .await?;
-
-    if ctx.json {
-        error::print_json(&resp);
-    } else {
-        let amount = resp["amount"].as_u64().unwrap_or(0);
-        let fee = resp["fee"].as_u64().unwrap_or(0);
-        error::success(&format!(
-            "Withdrawn {} (fee: {})",
-            super::format_amount(amount),
-            super::format_amount(fee),
-        ));
-    }
-    Ok(())
-}
-
 async fn run_list(ctx: &mut super::Context) -> Result<()> {
     let resp = ctx.get("/tabs").await?;
 
@@ -230,12 +199,30 @@ async fn run_list(ctx: &mut super::Context) -> Result<()> {
                 for tab in tabs {
                     let id = tab["id"].as_str().unwrap_or("?");
                     let provider = tab["provider"].as_str().unwrap_or("?");
-                    let balance = tab["balance_remaining"].as_u64().unwrap_or(0);
+                    let effective = tab["effective_balance"].as_u64().unwrap_or(0);
+                    let pending_count = tab["pending_charge_count"].as_i64().unwrap_or(0);
+                    let pending_total = tab["pending_charge_total"].as_u64().unwrap_or(0);
+                    let charges = tab["charge_count"].as_i64().unwrap_or(0);
                     let status = tab["status"].as_str().unwrap_or("?");
+                    let balance_str = if pending_count > 0 {
+                        format!(
+                            "{} ({} pending settlement)",
+                            super::format_amount(effective),
+                            super::format_amount(pending_total),
+                        )
+                    } else {
+                        super::format_amount(effective)
+                    };
+                    let charges_str = if pending_count > 0 {
+                        format!("{charges} (+{pending_count} pending)")
+                    } else {
+                        charges.to_string()
+                    };
                     error::print_kv(&[
                         ("Tab", id),
                         ("Provider", provider),
-                        ("Balance", &super::format_amount(balance)),
+                        ("Balance", &balance_str),
+                        ("Charges", &charges_str),
                         ("Status", status),
                     ]);
                 }

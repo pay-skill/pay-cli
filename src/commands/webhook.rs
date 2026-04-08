@@ -23,10 +23,10 @@ pub enum WebhookAction {
 pub struct WebhookRegisterArgs {
     /// Webhook URL
     pub url: String,
-    /// Events to subscribe to (comma-separated, e.g., "tab.charged,tab.closed")
+    /// Events to subscribe to (comma-separated, e.g., "tab.opened,tab.closed")
     #[arg(
         long,
-        default_value = "tab.opened,tab.charged,tab.closed,tab.topped_up,payment.completed"
+        default_value = "tab.opened,tab.closed,tab.topped_up,payment.completed"
     )]
     pub events: String,
     /// Webhook secret for HMAC verification

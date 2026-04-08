@@ -41,11 +41,12 @@ fn verify_windows(reason: &str) -> Result<()> {
     use windows::Security::Credentials::UI::*;
     use windows::Win32::System::Console::GetConsoleWindow;
     use windows::Win32::System::WinRT::IUserConsentVerifierInterop;
+    use windows_future::IAsyncOperation;
 
     // Check if Windows Hello is available
     let avail = UserConsentVerifier::CheckAvailabilityAsync()
         .map_err(|e| anyhow::anyhow!("Windows Hello check failed: {e}"))?
-        .get()
+        .GetResults()
         .map_err(|e| anyhow::anyhow!("Windows Hello check failed: {e}"))?;
 
     if avail != UserConsentVerifierAvailability::Available {
@@ -60,11 +61,11 @@ fn verify_windows(reason: &str) -> Result<()> {
     let hwnd = unsafe { GetConsoleWindow() };
     let message: windows::core::HSTRING = reason.into();
 
-    let op: windows::Foundation::IAsyncOperation<UserConsentVerificationResult> =
+    let op: IAsyncOperation<UserConsentVerificationResult> =
         unsafe { interop.RequestVerificationForWindowAsync(hwnd, &message) }
             .map_err(|e| anyhow::anyhow!("Windows Hello request failed: {e}"))?;
     let result = op
-        .get()
+        .GetResults()
         .map_err(|e| anyhow::anyhow!("Windows Hello verification failed: {e}"))?;
 
     if result == UserConsentVerificationResult::Verified {

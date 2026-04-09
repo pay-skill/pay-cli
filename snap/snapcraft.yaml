@@ -1,4 +1,4 @@
-name: pay
+name: pay-cli
 base: core22
 version: '0.2.2'
 summary: CLI for pay — USDC payment infrastructure for AI agents

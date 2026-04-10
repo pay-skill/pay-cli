@@ -4,6 +4,10 @@ use clap::Args;
 use crate::error;
 
 #[derive(Args)]
+#[command(
+    long_about = "Show wallet balance, locked amount (in open tabs), available amount, \
+        and open tab count. Defaults to your own wallet; use --wallet to check another address."
+)]
 pub struct StatusArgs {
     /// Wallet address to check
     #[arg(long)]

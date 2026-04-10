@@ -17,6 +17,11 @@ use crate::error;
 use crate::signer::{keyring, keystore, password};
 
 #[derive(Args)]
+#[command(
+    long_about = "Create a wallet and bootstrap config from the server. Stores the private \
+        key in the OS keychain by default (use --no-keychain for encrypted file on headless \
+        servers). Safe to re-run: refreshes config without creating a new key if one exists."
+)]
 pub struct InitArgs {
     /// Force encrypted file storage instead of OS keychain
     #[arg(long)]

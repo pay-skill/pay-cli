@@ -4,6 +4,13 @@ use clap::Args;
 use crate::error;
 
 #[derive(Args)]
+#[command(
+    long_about = "Send a one-shot USDC payment. Minimum $1.00. \
+        Fee: 1% (deducted from recipient). Uses EIP-2612 permits for gas-efficient approval.",
+    after_long_help = "EXAMPLES:\n  \
+        pay direct 0xABC...DEF 5.00\n  \
+        pay direct 0xABC...DEF 25.00 --memo \"Invoice #42\""
+)]
 pub struct DirectArgs {
     /// Recipient wallet address (0x...)
     pub to: String,

@@ -1,3 +1,4 @@
+pub mod completions;
 pub mod direct;
 pub mod discover;
 pub mod init;
@@ -9,6 +10,7 @@ pub mod sign;
 pub mod signer_cmd;
 pub mod status;
 pub mod tab;
+pub mod update;
 pub mod webhook;
 
 use anyhow::{bail, Result};

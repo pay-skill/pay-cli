@@ -4,6 +4,16 @@ use clap::{Args, Subcommand};
 use crate::error;
 
 #[derive(Args)]
+#[command(
+    long_about = "Manage pre-funded metered tabs. Open a tab to lock USDC with a provider. \
+        The provider charges incrementally against the tab. Close to settle on-chain and \
+        refund unused balance. Minimum $5 to open. 1% activation fee.",
+    after_long_help = "EXAMPLES:\n  \
+        pay tab open 0xABC...DEF 20.00 --max-charge 0.50\n  \
+        pay tab list\n  \
+        pay tab topup tab_abc123 10.00\n  \
+        pay tab close tab_abc123"
+)]
 pub struct TabArgs {
     #[command(subcommand)]
     pub action: TabAction,

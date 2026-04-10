@@ -7,6 +7,11 @@ use crate::config::Config;
 use crate::error;
 
 #[derive(Args)]
+#[command(
+    long_about = "Show the current network config, or switch between mainnet and testnet. \
+        Switching persists to ~/.pay/config.toml. For one-off testnet use without \
+        persisting, use the --testnet flag on any command instead."
+)]
 pub struct NetworkArgs {
     /// Network to switch to: "testnet" or "mainnet"
     network: Option<String>,

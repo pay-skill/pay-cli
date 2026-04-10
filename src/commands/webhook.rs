@@ -4,6 +4,11 @@ use clap::{Args, Subcommand};
 use crate::error;
 
 #[derive(Args)]
+#[command(
+    long_about = "Manage webhook subscriptions. Events are delivered via HTTPS POST with \
+        HMAC-SHA256 signatures. Always provide a unique --secret value when registering. \
+        The default secret is insecure and should not be used in production."
+)]
 pub struct WebhookArgs {
     #[command(subcommand)]
     pub action: WebhookAction,

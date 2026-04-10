@@ -9,6 +9,16 @@ use reqwest::Method;
 use crate::error;
 
 #[derive(Args)]
+#[command(
+    long_about = "Make an HTTP request. If the server returns 402 Payment Required with \
+        x402 headers, pay automatically handles payment (via tab or direct) and retries \
+        the request. Supports curl-like flags for method, headers, and body.",
+    after_long_help = "EXAMPLES:\n  \
+        pay request https://api.example.com/data\n  \
+        pay request -X POST -d '{\"q\":\"test\"}' https://api.example.com/search\n  \
+        pay request -H \"Authorization: Bearer tok\" https://api.example.com/me\n  \
+        pay request --no-pay https://api.example.com/data    Inspect 402 without paying"
+)]
 pub struct RequestArgs {
     /// URL to request (x402 payment handled automatically)
     pub url: String,

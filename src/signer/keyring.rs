@@ -1,9 +1,14 @@
 //! OS keychain backend for private key storage.
 //!
-//! Stores raw 32-byte private keys in the platform's native credential store:
+//! Stores private keys as 0x-prefixed hex strings in the platform's native
+//! credential store:
 //! - macOS: Security.framework Keychain
 //! - Windows: Credential Manager (DPAPI)
 //! - Linux: Secret Service API (GNOME Keyring / KWallet)
+//!
+//! Hex string format ensures cross-language compatibility: both the Rust CLI
+//! (`keyring::get_password`) and the Node SDK (`keytar.getPassword`) can read
+//! the same credential as a UTF-8 string.
 //!
 //! Security invariants:
 //! - K1: Raw key returned in `Zeroizing<[u8; 32]>` -- zeroed on drop.
@@ -12,6 +17,7 @@
 //! - K4: MetaFile contains ONLY public info (address, storage type). No secrets.
 //! - K5: `is_available()` is non-destructive -- never stores, loads, or deletes.
 //! - K6: `store_key` takes `&[u8; 32]` -- caller controls key lifetime.
+//! - K7: `load_key` migrates legacy raw-byte entries to hex on read.
 #![deny(unsafe_code)]
 #![deny(clippy::unwrap_used)]
 
@@ -119,15 +125,19 @@ pub fn is_available() -> bool {
     false
 }
 
-/// Store a raw 32-byte private key in the OS keychain.
+/// Store a 32-byte private key in the OS keychain as a 0x-prefixed hex string.
+///
+/// Hex format ensures both Rust (`get_password`) and Node (`keytar.getPassword`)
+/// can read the credential reliably across platforms.
 ///
 /// K6: Takes `&[u8; 32]` -- caller controls key lifetime.
 #[cfg(feature = "keychain")]
 pub fn store_key(label: &str, key: &[u8; 32]) -> Result<()> {
     let entry =
         keyring::Entry::new(KEYCHAIN_SERVICE, label).map_err(|e| anyhow!("keychain error: {e}"))?;
+    let hex = format!("0x{}", hex::encode(key));
     entry
-        .set_secret(key.as_ref())
+        .set_password(&hex)
         .map_err(|e| anyhow!("failed to store key in OS keychain: {e}"))
 }
 
@@ -138,15 +148,36 @@ pub fn store_key(_label: &str, _key: &[u8; 32]) -> Result<()> {
     ))
 }
 
-/// Retrieve a raw 32-byte private key from the OS keychain.
+/// Retrieve a 32-byte private key from the OS keychain.
+///
+/// Tries hex string format first (new format). If the credential is not valid
+/// hex, falls back to raw 32-byte format (legacy) and auto-migrates the entry
+/// to hex so future reads (including from Node/keytar) work correctly.
 ///
 /// K1: Returns `Zeroizing<[u8; 32]>` -- zeroed on drop.
 /// K3: Error messages never include key material.
+/// K7: Migrates legacy raw-byte entries to hex on read.
 #[cfg(feature = "keychain")]
 pub fn load_key(label: &str) -> Result<Zeroizing<[u8; 32]>> {
     let entry =
         keyring::Entry::new(KEYCHAIN_SERVICE, label).map_err(|e| anyhow!("keychain error: {e}"))?;
 
+    // Try reading as a string first (hex format, new path).
+    if let Ok(password) = entry.get_password() {
+        let trimmed = password.trim();
+        let hex_str = trimmed.strip_prefix("0x").unwrap_or(trimmed);
+        if hex_str.len() == 64 {
+            if let Ok(bytes) = hex::decode(hex_str) {
+                if bytes.len() == 32 {
+                    let mut arr = Zeroizing::new([0u8; 32]);
+                    arr.copy_from_slice(&bytes);
+                    return Ok(arr);
+                }
+            }
+        }
+    }
+
+    // Fall back to raw bytes (legacy format).
     let secret = entry.get_secret().map_err(|e| match e {
         keyring::Error::NoEntry => {
             anyhow!("no key '{label}' found in OS keychain. Run: pay init")
@@ -166,6 +197,13 @@ pub fn load_key(label: &str) -> Result<Zeroizing<[u8; 32]>> {
 
     let mut arr = Zeroizing::new([0u8; 32]);
     arr.copy_from_slice(&secret);
+
+    // K7: Auto-migrate legacy entry to hex format.
+    let hex = format!("0x{}", hex::encode(&*arr));
+    if entry.set_password(&hex).is_ok() {
+        eprintln!("pay: migrated keychain entry '{label}' from raw bytes to hex format");
+    }
+
     Ok(arr)
 }
 
@@ -292,6 +330,15 @@ mod tests {
 
         store_key(test_label, &test_key).expect("store_key should succeed");
 
+        // Verify stored as hex string, not raw bytes
+        let entry = keyring::Entry::new(KEYCHAIN_SERVICE, test_label).unwrap();
+        let stored = entry.get_password().expect("should read as string");
+        assert!(
+            stored.starts_with("0x"),
+            "stored value must be 0x-prefixed hex"
+        );
+        assert_eq!(stored.len(), 66, "stored hex must be 66 chars (0x + 64)");
+
         let loaded = load_key(test_label).expect("load_key should succeed");
         assert_eq!(*loaded, test_key, "loaded key must match stored key");
 
@@ -299,6 +346,38 @@ mod tests {
 
         let result = load_key(test_label);
         assert!(result.is_err(), "load after delete should fail");
+    }
+
+    /// Verify that load_key can read legacy raw-byte entries and auto-migrates them.
+    #[test]
+    #[cfg(feature = "keychain")]
+    fn keychain_legacy_raw_bytes_migration() {
+        if !is_available() {
+            eprintln!("skipping keychain_legacy_raw_bytes_migration: no keychain available");
+            return;
+        }
+
+        let test_label = "__pay_test_legacy_migration__";
+        let test_key: [u8; 32] = [0xcd; 32];
+
+        // Store as raw bytes (legacy format) using set_secret directly
+        let entry = keyring::Entry::new(KEYCHAIN_SERVICE, test_label).unwrap();
+        entry.set_secret(test_key.as_ref()).unwrap();
+
+        // load_key should still read it and auto-migrate
+        let loaded = load_key(test_label).expect("load_key should read legacy raw bytes");
+        assert_eq!(*loaded, test_key, "loaded key must match stored key");
+
+        // After migration, entry should now be hex
+        let migrated = entry.get_password().expect("should read as string after migration");
+        assert!(
+            migrated.starts_with("0x"),
+            "migrated value must be 0x-prefixed hex"
+        );
+        let expected_hex = format!("0x{}", hex::encode(test_key));
+        assert_eq!(migrated, expected_hex, "migrated hex must match");
+
+        delete_key(test_label).expect("cleanup");
     }
 
     #[test]

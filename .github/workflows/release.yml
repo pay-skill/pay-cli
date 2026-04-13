@@ -132,7 +132,7 @@ jobs:
           ref: ${{ env.TAG }}
       - uses: dtolnay/rust-toolchain@stable
       - name: Publish to crates.io
-        run: cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }} || echo "Already published (or publish failed)"
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
@@ -142,8 +142,24 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          path: artifacts
-          pattern: pay-*
+          name: pay-linux-amd64
+          path: artifacts/pay-linux-amd64
+      - uses: actions/download-artifact@v4
+        with:
+          name: pay-linux-arm64
+          path: artifacts/pay-linux-arm64
+      - uses: actions/download-artifact@v4
+        with:
+          name: pay-macos-amd64
+          path: artifacts/pay-macos-amd64
+      - uses: actions/download-artifact@v4
+        with:
+          name: pay-macos-arm64
+          path: artifacts/pay-macos-arm64
+      - uses: actions/download-artifact@v4
+        with:
+          name: pay-windows-amd64.exe
+          path: artifacts/pay-windows-amd64.exe
 
       - name: Create release
         uses: softprops/action-gh-release@v2

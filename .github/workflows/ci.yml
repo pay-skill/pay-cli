@@ -51,4 +51,3 @@ jobs:
 
       - name: OWS integration tests
         run: cargo test --test e2e -- --ignored ows_
-        continue-on-error: true

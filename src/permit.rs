@@ -97,13 +97,8 @@ pub async fn ensure_relayer_approved(ctx: &mut commands::Context) -> Result<()> 
     // Relayer does raw transferFrom — no fee, no restrictions.
     let max_value: u64 = u64::MAX;
     let far_deadline: u64 = now_secs() + 365 * 24 * 60 * 60;
-    let permit = prepare_and_sign_with_deadline(
-        ctx,
-        max_value,
-        &contracts.relayer,
-        far_deadline,
-    )
-    .await?;
+    let permit =
+        prepare_and_sign_with_deadline(ctx, max_value, &contracts.relayer, far_deadline).await?;
 
     // Store server-side (no gas, just DB). Use the ACTUAL signed deadline.
     ctx.post(

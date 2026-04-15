@@ -247,9 +247,7 @@ async fn main() -> Result<()> {
             // Ensure relayer is approved (one-time, no gas — just stores permit).
             permit::ensure_relayer_approved(&mut ctx).await?;
 
-            let resp = ctx
-                .post("/links/withdraw", &serde_json::json!({}))
-                .await?;
+            let resp = ctx.post("/links/withdraw", &serde_json::json!({})).await?;
             let url = resp["url"].as_str().unwrap_or("");
             if ctx.json {
                 error::print_json(&resp);

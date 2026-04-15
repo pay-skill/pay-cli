@@ -61,10 +61,9 @@ fn verify_windows(reason: &str) -> Result<()> {
     let hwnd = unsafe { GetConsoleWindow() };
     let message: windows::core::HSTRING = reason.into();
 
-    let result = unsafe { interop.RequestVerificationForWindowAsync(hwnd, &message) }
-        .and_then(|op: windows_future::IAsyncOperation<UserConsentVerificationResult>| {
-            op.GetResults()
-        });
+    let result = unsafe { interop.RequestVerificationForWindowAsync(hwnd, &message) }.and_then(
+        |op: windows_future::IAsyncOperation<UserConsentVerificationResult>| op.GetResults(),
+    );
 
     match result {
         Ok(UserConsentVerificationResult::Verified) => Ok(()),
@@ -78,7 +77,9 @@ fn verify_windows(reason: &str) -> Result<()> {
 fn verify_windows_password(reason: &str) -> Result<()> {
     use windows::core::PCWSTR;
     use windows::Win32::Foundation::CloseHandle;
-    use windows::Win32::Security::{LogonUserW, LOGON32_LOGON_INTERACTIVE, LOGON32_PROVIDER_DEFAULT};
+    use windows::Win32::Security::{
+        LogonUserW, LOGON32_LOGON_INTERACTIVE, LOGON32_PROVIDER_DEFAULT,
+    };
 
     eprintln!("Identity verification required: {reason}");
     eprintln!();

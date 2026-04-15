@@ -369,7 +369,9 @@ mod tests {
         assert_eq!(*loaded, test_key, "loaded key must match stored key");
 
         // After migration, entry should now be hex
-        let migrated = entry.get_password().expect("should read as string after migration");
+        let migrated = entry
+            .get_password()
+            .expect("should read as string after migration");
         assert!(
             migrated.starts_with("0x"),
             "migrated value must be 0x-prefixed hex"

@@ -279,9 +279,9 @@ fn signer_export_requires_interactive_terminal() {
     cmd.env("PAYSKILL_SIGNER_KEY", TEST_PASSWORD);
     cmd.args(["signer", "export"]);
 
-    cmd.assert().failure().stderr(
-        predicate::str::contains("interactive terminal"),
-    );
+    cmd.assert()
+        .failure()
+        .stderr(predicate::str::contains("interactive terminal"));
 }
 
 #[test]

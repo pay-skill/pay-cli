@@ -448,16 +448,20 @@ fn x402_request_handles_402_and_pays() {
                 );
                 let _ = stream.write_all(resp.as_bytes());
             } else {
-                // V2: requirements in body AND base64-encoded in PAYMENT-REQUIRED header
-                let requirements = format!(
-                    r#"{{"scheme":"exact","amount":1000000,"to":"{}","settlement":"direct","facilitator":"https://testnet.pay-skill.com/x402","maxChargePerCall":1000000,"network":"eip155:84532"}}"#,
+                // V2 format — see try_extract_v2() in src/commands/request.rs.
+                // Required shape: { x402Version: 2, accepts: [{ amount: "<u64
+                // as string>", payTo: "0x...", extra: { settlement: "direct"
+                // | "tab" } }] }. amount MUST be a string (parser calls
+                // as_str().parse::<u64>). Both the response body and the
+                // base64-encoded `payment-required` header carry the same
+                // payload; the parser checks the header first, body as
+                // fallback.
+                let body = format!(
+                    r#"{{"x402Version":2,"accepts":[{{"scheme":"exact","network":"eip155:84532","asset":"USDC","payTo":"{}","amount":"1000000","extra":{{"settlement":"direct"}}}}]}}"#,
                     provider_addr()
                 );
                 use base64::Engine;
-                let req_b64 = base64::engine::general_purpose::STANDARD.encode(&requirements);
-                let body = format!(
-                    r#"{{"error":"payment_required","message":"This resource requires payment","requirements":{requirements}}}"#,
-                );
+                let req_b64 = base64::engine::general_purpose::STANDARD.encode(&body);
                 let resp = format!(
                     "HTTP/1.1 402 Payment Required\r\nContent-Type: application/json\r\nContent-Length: {}\r\npayment-required: {}\r\nConnection: close\r\n\r\n{}",
                     body.len(),

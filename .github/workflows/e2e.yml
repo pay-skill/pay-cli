@@ -44,8 +44,20 @@ jobs:
       - name: Initialize CLI
         run: cargo run -- init
 
-      - name: Mint testnet USDC
-        run: cargo run -- mint 200.00
+      - name: Ensure sufficient testnet USDC balance
+        run: |
+          # Mint only when the shared CI wallet is below the floor. The mint
+          # endpoint rate-limits 1 call per wallet per hour, and we reuse the
+          # same PAYSKILL_TESTNET_KEY across all CI runs — without this guard,
+          # CI hits 429 whenever two runs land within an hour.
+          BAL=$(cargo run -- status 2>/dev/null | jq -r '.balance_usdc // "0"')
+          echo "Current balance: $BAL USDC"
+          if [ "$(awk -v v="$BAL" 'BEGIN{print (v<20)}')" = "1" ]; then
+            echo "Balance below $20 floor — minting 200 USDC"
+            cargo run -- mint 200.00
+          else
+            echo "Balance sufficient — skipping mint"
+          fi
 
       - name: Run all E2E acceptance tests
         run: cargo test --test e2e -- --ignored --test-threads=1

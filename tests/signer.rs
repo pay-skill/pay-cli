@@ -200,6 +200,41 @@ fn sign_with_password_enc_file() {
     assert_eq!(stdout.trim().len(), 130);
 }
 
+// -- pay signer export --------------------------------------------------------
+
+#[test]
+fn signer_export_requires_interactive_terminal() {
+    let (home, _keys, keys_path) = temp_dirs();
+
+    // Import a key first
+    let mut cmd = pay_cmd(&keys_path, home.path());
+    cmd.env("PAYSKILL_SIGNER_KEY", TEST_PASSWORD);
+    cmd.args(["signer", "import", "--key", ANVIL_KEY, "--no-keychain"]);
+    cmd.assert().success();
+
+    // Export in non-interactive mode must fail with terminal check, not
+    // with a Windows Hello / OS auth error. This is the safety gate.
+    let mut cmd = pay_cmd(&keys_path, home.path());
+    cmd.env("PAYSKILL_SIGNER_KEY", TEST_PASSWORD);
+    cmd.args(["signer", "export"]);
+
+    cmd.assert().failure().stderr(
+        predicate::str::contains("interactive terminal"),
+    );
+}
+
+#[test]
+fn signer_export_no_key_fails() {
+    let (home, _keys, keys_path) = temp_dirs();
+
+    // Export with no key configured should fail
+    let mut cmd = pay_cmd(&keys_path, home.path());
+    cmd.env_remove("PAYSKILL_SIGNER_KEY");
+    cmd.args(["signer", "export"]);
+
+    cmd.assert().failure();
+}
+
 // -- Error cases --------------------------------------------------------------
 
 #[test]

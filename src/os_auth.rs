@@ -41,32 +41,52 @@ fn verify_windows(reason: &str) -> Result<()> {
     use windows::Security::Credentials::UI::*;
     use windows::Win32::System::Console::GetConsoleWindow;
     use windows::Win32::System::WinRT::IUserConsentVerifierInterop;
-    use windows_future::IAsyncOperation;
 
-    // Check if Windows Hello is available
-    let avail = UserConsentVerifier::CheckAvailabilityAsync()
-        .map_err(|e| anyhow::anyhow!("Windows Hello check failed: {e}"))?
-        .GetResults()
-        .map_err(|e| anyhow::anyhow!("Windows Hello check failed: {e}"))?;
+    // Check if Windows Hello is available.
+    // If the WinRT async call itself fails (e.g. 0x8000000E when the COM
+    // apartment or console context is wrong), fall back to password rather
+    // than hard-failing — the user still has a valid login password.
+    let avail = match UserConsentVerifier::CheckAvailabilityAsync()
+        .and_then(|op| op.GetResults())
+    {
+        Ok(a) => a,
+        Err(e) => {
+            eprintln!("Windows Hello unavailable ({e}). Falling back to password prompt.");
+            return verify_windows_password(reason);
+        }
+    };
 
     if avail != UserConsentVerifierAvailability::Available {
         eprintln!("Windows Hello not available. Falling back to password prompt.");
         return verify_windows_password(reason);
     }
 
-    let interop: IUserConsentVerifierInterop =
-        factory::<UserConsentVerifier, IUserConsentVerifierInterop>()
-            .map_err(|e| anyhow::anyhow!("Windows Hello interop failed: {e}"))?;
+    let interop: IUserConsentVerifierInterop = match factory::<
+        UserConsentVerifier,
+        IUserConsentVerifierInterop,
+    >() {
+        Ok(i) => i,
+        Err(e) => {
+            eprintln!("Windows Hello interop unavailable ({e}). Falling back to password prompt.");
+            return verify_windows_password(reason);
+        }
+    };
 
     let hwnd = unsafe { GetConsoleWindow() };
     let message: windows::core::HSTRING = reason.into();
 
-    let op: IAsyncOperation<UserConsentVerificationResult> =
-        unsafe { interop.RequestVerificationForWindowAsync(hwnd, &message) }
-            .map_err(|e| anyhow::anyhow!("Windows Hello request failed: {e}"))?;
-    let result = op
-        .GetResults()
-        .map_err(|e| anyhow::anyhow!("Windows Hello verification failed: {e}"))?;
+    let result = match unsafe { interop.RequestVerificationForWindowAsync(hwnd, &message) }
+        .and_then(|op: windows_future::IAsyncOperation<UserConsentVerificationResult>| {
+            op.GetResults()
+        }) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!(
+                "Windows Hello prompt failed ({e}). Falling back to password prompt."
+            );
+            return verify_windows_password(reason);
+        }
+    };
 
     if result == UserConsentVerificationResult::Verified {
         Ok(())

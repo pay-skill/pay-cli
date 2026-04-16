@@ -1066,3 +1066,45 @@ fn request_at_file_body() {
         "should get response after @file body, got: {stdout}"
     );
 }
+
+// ── Discover ───────────────────────────────────────────────────────
+
+#[test]
+#[ignore = "requires PAYSKILL_TESTNET_KEY"]
+fn discover_returns_json_array() {
+    pay()
+        .args(["--json", "discover"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("services"));
+}
+
+#[test]
+#[ignore = "requires PAYSKILL_TESTNET_KEY"]
+fn discover_with_query_returns_json() {
+    pay()
+        .args(["--json", "discover", "weather"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("services"));
+}
+
+#[test]
+#[ignore = "requires PAYSKILL_TESTNET_KEY"]
+fn discover_sort_name_works() {
+    pay()
+        .args(["--json", "discover", "--sort", "name"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("services"));
+}
+
+#[test]
+#[ignore = "requires PAYSKILL_TESTNET_KEY"]
+fn discover_nonexistent_returns_empty() {
+    pay()
+        .args(["--json", "discover", "xyzzy_nonexistent_99"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("services"));
+}

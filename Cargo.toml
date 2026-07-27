@@ -18,7 +18,7 @@ keychain = ["dep:keyring"]
 [dependencies]
 keyring = { version = "3", features = ["apple-native", "windows-native", "linux-native"], optional = true }
 anyhow = "1"
-base64 = "0.22"
+base64 = "0.23"
 clap = { version = "4", features = ["derive", "env", "string"] }
 clap_complete = "4"
 comfy-table = "7"

@@ -30,7 +30,7 @@ tokio = { version = "1", features = ["full"] }
 toml = "1.1"
 k256 = { version = "0.13", features = ["ecdsa"] }
 sha3 = "0.12"
-aes-gcm = "0.10"
+aes-gcm = "0.11"
 hex = "0.4"
 getrandom = "0.4"
 scrypt = "0.11"

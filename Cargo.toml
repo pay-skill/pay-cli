@@ -21,7 +21,7 @@ anyhow = "1"
 base64 = "0.23"
 clap = { version = "4", features = ["derive", "env", "string"] }
 clap_complete = "4"
-comfy-table = "7"
+comfy-table = "8"
 dirs = "6"
 reqwest = { version = "0.13", features = ["json"] }
 serde = { version = "1", features = ["derive"] }

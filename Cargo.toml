@@ -51,7 +51,7 @@ features = [
 ]
 
 [target.'cfg(windows)'.dependencies.windows-future]
-version = "0.3"
+version = "0.100"
 
 [dev-dependencies]
 assert_cmd = "2"
